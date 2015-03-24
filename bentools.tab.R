@@ -6,7 +6,7 @@ require(dplyr)
 #expandTk <- function() {
   
 # starting values  ----
-my_version_num <- 'Ben Tools v.1.tab'
+my_version_num <- 'Ben Tools tabs'
 FILE_LIST <- list(NULL) # for holding table files in list
 FILE_LIST_INFO <- list(NULL)
 # c(full_name, NAs, Zeros)
@@ -18,7 +18,6 @@ GENE_LIST_INFO <- list(list("NA"))
 STATE <- c(0, 0, 0) # Keep track of the state and flow control 
 # [1] active tab number, [2] check if load file window open, 
 # [3] when busy stop user input/activity
-CNUM <- 1
 
 # value lists ----
 my_dotlist <- c("circle", "triangle point up", "plus", "cross", "diamond", 
@@ -29,18 +28,17 @@ my_dotlist <- c("circle", "triangle point up", "plus", "cross", "diamond",
                 "bullet (smaller circle)", "square")
 my_linelist <- c("solid line", "dashed line", "dotted line", "dot dash line", 
                  "long dash line", "two dash line", "split line")
-MY_COLORS <- list(c("yellow", "blue", "green", "red", "orange", "purple", rep("black",10)),
-                  c("red", "orange", "purple", "yellow", "blue", "green", rep("black",10)))
-my_colorsets <- c("colorset1", "colorset2")
+MY_COLORS <- list("colorset1" = c("yellow", "blue", "green", "red", "orange", "purple", rep("black",10)),
+                  "colorset2" = c("red", "orange", "purple", "yellow", "blue", "green", rep("black",10)))
 
 
 # tcl starting values ----
 
 sf <- tclVar("Load File")
-cs <- tclVar(my_colorsets[1])
+cs <- tclVar(names(MY_COLORS)[1])
 ll <- tclVar(my_linelist[1])
 dl <- tclVar(my_dotlist[1])
-cl <- tclVar(MY_COLORS[[CNUM]][1])
+cl <- tclVar(MY_COLORS[[1]][1])
 
 # functions ----
 
@@ -114,7 +112,7 @@ GetTableFile <- function(...) {
                                                      sum(first_file==0, na.rm = TRUE)))
       GENE_LIST_INFO[[1]][[file_count]] <<- c(ld_name, legend_name,
                                                     my_dotlist[1], my_linelist[1], 
-                                                    MY_COLORS[[CNUM]][file_count], 1)
+                                                    MY_COLORS[[tclvalue(tkget(color_sets))]][file_count], 1)
       first_file[is.na(first_file)] <- 0
       FILE_LIST[[file_count]] <<- first_file
     }
@@ -163,14 +161,13 @@ cbb_setvalues <- function(){
 
 # Adds ability to change color sets
 cbb_colorsets <- function(){
-  cnum <- as.numeric(tclvalue(tcl(color_sets,"current")))+1
   num <- as.numeric(tclvalue(tcl(cbb_file,"current")))+1
   if(num < 1){
     num <- 1
   }
-  if(STATE[3] == 0 & cnum > 0){
-    CNUM <<- cnum
-    tkconfigure(cbb_color, textvariable=tclVar(MY_COLORS[[CNUM]][num]))
+  if(STATE[3] == 0){
+    tkconfigure(cbb_color, 
+                textvariable=tclVar(MY_COLORS[[tclvalue(tkget(color_sets))]][num]))
     GENE_LIST_INFO[[1]][[num]][5] <<- tclvalue(tkget(cbb_color))
   }
 }
@@ -217,7 +214,7 @@ tkgrid(cbb_file, sticky = "n")
 tkbind(cbb_file, "<<ComboboxSelected>>", cbb_configure)
 tkconfigure(cbb_file, textvariable = sf, state = "disable")
 
-color_sets <- tk2combobox(tab1box1, value = my_colorsets, textvariable = cs, 
+color_sets <- tk2combobox(tab1box1, value = names(MY_COLORS), textvariable = cs, 
                           state="readonly")
 tkgrid(color_sets, sticky = "s")
 tkbind(color_sets, "<<ComboboxSelected>>", cbb_colorsets)
@@ -274,8 +271,8 @@ tkbind(cbb_dot, "<<ComboboxSelected>>", cbb_setvalues)
 tkgrid(tklistbox(tab1box2, listvariable = tclVar("color"), height = 1, width = 5, 
                  relief = 'flat', background = 'gray93'), padx = c(20, 0))
 
-cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[CNUM]], textvariable= cl, 
-                         state="readonly")
+cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(color_sets))]], 
+                         textvariable= cl, state="readonly")
 tkgrid(cbb_color, sticky = "w", column = 1, row = 5, padx = c(0, 16)) 
 tkbind(cbb_color, "<<ComboboxSelected>>", cbb_setvalues)
 
