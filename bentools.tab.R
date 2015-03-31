@@ -1,4 +1,4 @@
-
+require(ggplot2)
 require(tcltk)
 require(tcltk2)
 require(dplyr)
@@ -144,8 +144,8 @@ GetTableFile <- function(...) {
                                                paste(" Zeors = ", 
                                                      sum(first_file==0, na.rm = TRUE)))
       GENE_LIST_INFO[[1]][[file_count]] <<- c(ld_name, legend_name,
-                                                    my_dotlist[1], my_linelist[1], 
-                                                    MY_COLORS[[tclvalue(tkget(color_sets))]][file_count], paste("X",ld_name,sep=""))
+                                               my_dotlist[1], my_linelist[1], 
+                                               MY_COLORS[[tclvalue(tkget(color_sets))]][file_count], 1)
       first_file[is.na(first_file)] <- 0
       FILE_LIST[[file_count]] <<- first_file
     }
@@ -156,10 +156,6 @@ GetTableFile <- function(...) {
   }
 }
 
-# remove tips
-  # tkdesroy(name)
-  # rm(list=name) and Xname
-  # then remove the lists 3x 
 
 # After file is loaded comboboxes are added to and set
 GetTableFileHelper <- function(...){
@@ -168,22 +164,91 @@ GetTableFileHelper <- function(...){
     tkconfigure(cbb_file, textvariable=tclVar(last(sapply(GENE_LIST_INFO[[1]], "[[", 1))))
     tkdelete(full_name2, 0, "end")
     tkinsert(full_name2, 0, tkget(cbb_file))
-    assign(last(sapply(GENE_LIST_INFO[[1]], "[[", 6)),tclVar("1"),pos=1)
-    assign(last(sapply(GENE_LIST_INFO[[1]], "[[", 1)), 
-             tkcheckbutton(cgtabbox1,text= last(sapply(GENE_LIST_INFO[[1]], "[[", 1)),
-                           variable=get(last(sapply(GENE_LIST_INFO[[1]], "[[", 6)))),
-                           pos=1)
-    tkgrid(get(last(sapply(GENE_LIST_INFO[[1]], "[[", 1))))
+    #change to add to plot list
+    #assign(last(sapply(GENE_LIST_INFO[[1]], "[[", 6)),tclVar("1"),pos=1)
+    #assign(last(sapply(GENE_LIST_INFO[[1]], "[[", 1)), 
+    #         tkcheckbutton(cgtabbox1,text= last(sapply(GENE_LIST_INFO[[1]], "[[", 1)),
+     #                      variable=get(last(sapply(GENE_LIST_INFO[[1]], "[[", 6)))),
+      #                     pos=1)
+    #tkgrid(get(last(sapply(GENE_LIST_INFO[[1]], "[[", 1))))
     cbb_configure()
   }
 }
+
+# Makes data frame for plotting
+MakeDataFrame <- function(){
+  if(STATE[3] == 1 | is.null(FILE_LIST[[1]])){
+    return()
+    }else{
+    use_col <- NULL
+    use_dot <- NULL
+    use_line <- NULL
+    use_name <- NULL
+    wide_list <- list(NULL)
+    for(i in seq_along(GENE_LISTS)){
+      if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){
+        return()
+      }else{
+        enesg <- data.frame(gene=GENE_LISTS[[i]][[1]])
+        lapply(seq_along(FILE_LIST), function(k) 
+          if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){          
+            inner_join(enesg, FILE_LIST[[k]], by = "gene") ->> wide_list[[k]]
+            use_col <<- c(use_col, GENE_LIST_INFO[[i]][[k]][5])
+            use_dot <<- c(use_dot, GENE_LIST_INFO[[i]][[k]][3])
+            use_line <<- c(use_line, GENE_LIST_INFO[[i]][[k]][4])
+            use_name <<- c(use_name, GENE_LIST_INFO[[i]][[k]][2])
+          }
+        )
+      } 
+    }
+  }
+  if(!is.null(wide_list[[1]])){
+    ApplyMath(wide_list, use_col, use_dot, use_line, use_name)
+  }
+}
+
+# Applys math to long list ... TODO
+ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
+  lapply(seq_along(wide_list), function(i) 
+    data.frame(bin=(seq_along(wide_list[[i]][-1])), 
+               set=(as.character(use_name[i])), 
+               value=colSums(wide_list[[i]][,-1], na.rm=TRUE))) -> math_list
+  print(summary(math_list[[1]])) # remove factors
+  long_list <- rbind_all(math_list)
+  GGplotF(long_list, use_col, use_dot, use_line)
+}
+
+# ggplot function
+GGplotF <- function(long_list, use_col, use_dot, use_line){
+  main <- "header" #TODO
+  
+  ggplot(long_list, aes(x=bin, y=value, group=set, color=set, shape=set)) + 
+    # Use larger points, fill with white
+    geom_line(size=2) + geom_point(size=4, fill="white") +  
+    #ylim(0, 0.0009) +             # Set y range
+    scale_color_manual(name="Sample", values=use_col)+
+    scale_shape_manual(name="Sample", values=c(22,21)) +      # Use points with a fill color
+    xlab("Bins") + ylab("mean of bin counts") + # Set axis labels
+    ggtitle(main) +  # Set title
+    scale_x_continuous( breaks=c(10,20,30,70),
+                        minor_breaks=seq(50,60,by=2) )+
+    theme_bw() +
+    #theme(legend.position=c(.9,.85))+   # Position legend inside and This must go after theme_bw
+    theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 1, face = 'bold'))
+  
+  
+  
+}
+
+# translates dot and line chr to number
+#TODO
 
 # sets comboboxs to correct values
 cbb_configure <- function(){
   num <- as.numeric(tclvalue(tcl(cbb_file,"current")))+1
   if(!is.null(FILE_LIST[[1]]) & num > 0 & STATE[3] == 0){
     tkconfigure(cbb_color, textvariable=tclVar(sapply(GENE_LIST_INFO[[1]], "[[", 5)[num]))
-    tkconfigure(cbb_line, textvariable=tclVar((sapply(GENE_LIST_INFO[[1]], "[[", 4)[num])))
+    tkconfigure(cbb_line, textvariable=tclVar(sapply(GENE_LIST_INFO[[1]], "[[", 4)[num]))
     tkconfigure(cbb_dot, textvariable=tclVar(sapply(GENE_LIST_INFO[[1]], "[[", 3)[num]))
     tkconfigure(new_name, textvariable=tclVar(sapply(GENE_LIST_INFO[[1]], "[[", 2)[num]))
     tkconfigure(stats_list, listvariable = 
@@ -215,6 +280,8 @@ cbb_colorsets <- function(){
     GENE_LIST_INFO[[1]][[num]][5] <<- tclvalue(tkget(cbb_color))
   }
 }
+
+
 
 
 # GUI function ----
@@ -332,8 +399,8 @@ tab2box1 <- tkframe(plottab, relief = 'ridge', borderwidth = 5)
 
 tkgrid(tklabel(tab2box1, text = "Plot Options", width = 38))  
 
-tkgrid(tkbutton(tab2box1, font =c('bold', 23), text = '      Plot       '
-                )) 
+tkgrid(tkbutton(tab2box1, font =c('bold', 23), text = '      Plot       ', 
+                command = function() MakeDataFrame())) 
 
 cbb_math <- tk2combobox(tab2box1, value = my_math, state="readonly")
 tkgrid(cbb_math, sticky = "n")
@@ -479,15 +546,19 @@ pnb <- tk2notebook(tab2box2, tabs =c("Common Genes","Gene list 1","Gene list 2",
 tkgrid(pnb)
 pttab <- tk2notetab(pnb, "Common Genes")
 cgtabbox2 <- tkframe(pttab)
-
 tkgrid(tklabel(cgtabbox2, text= "List of table files"), columnspan = 6)
-tkgrid(tkbutton(cgtabbox2, text = "on"))
-tkgrid(tkbutton(cgtabbox2, text = "off"), column = 1, row = 1)
+cgonbox <- tk2listbox(cgtabbox2, width = 40, height = 13)
+tkgrid(cgonbox, columnspan = 3)
+tkgrid(tkbutton(cgtabbox2,text="<<Switch>>"), 
+       tkbutton(cgtabbox2,text="<<All On>>"), tkbutton(cgtabbox2,text="<<All Off>>"),
+       sticky = 'we')
+cgoffbox <- tk2listbox(cgtabbox2, width = 40, height = 13)
+tkgrid(cgoffbox, columnspan = 3)
 tkgrid(cgtabbox2)
 
 cgtabbox1 <- tkframe(pttab)
 tkgrid(cgtabbox1)
-tkgrid(tab2box2, column = 1, row = 0)
+tkgrid(tab2box2, column = 1, row = 0, rowspan = 2)
 
 
 
