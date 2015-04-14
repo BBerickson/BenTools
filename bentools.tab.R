@@ -10,10 +10,10 @@ my_version_num <- 'Ben Tools tabs'
 FILE_LIST <- list(NULL) # for holding table files in list
 FILE_LIST_INFO <- list(NULL)
 # c(full_name, NAs, Zeros)
-GENE_LISTS <- list(list(NULL,NULL)) # for holding each gene list
+GENE_LISTS <- list() # for holding each gene list
 #[[1]] Original [[2]] common 
-GENE_LIST_INFO <- list(list("NA")) 
-# c(name, nickname, dot", line", color, plot?)
+GENE_LIST_INFO <- list() 
+# c(name, nickname, dot", line", color, plot yes/no)
 # for each file in each common gene list 
 STATE <- c(0, 0, 0, 1) # Keep track of the state and flow control 
 # [1] active tab number, [2] check if load file window open, 
@@ -35,7 +35,7 @@ Legend_loc <- c("outside", "topright", "top", "topleft", "bottomright", "bottom"
 plot_lines <- c("543 bins 20,20,40", "5 1.5k-2k 70 bins", "543 bins 10,10,10", "543 bins 20,20,20", "5 .5k-1.5k")
 
 # tcl starting values ----
-
+#TODO fix lables
 sf <- tclVar("Load File")
 cs <- tclVar(names(MY_COLORS)[1])
 ll <- tclVar(my_linelist[1])
@@ -75,6 +75,11 @@ min_ylim <- tclVar('')
 
 # functions ----
 
+# test function
+onOK <- function(){
+  print("this works")
+}
+
 # reads in file, tests, fills out info 
 GetTableFile <- function(...) {
   if(STATE[3] == 0){
@@ -113,7 +118,6 @@ GetTableFile <- function(...) {
                                comment.char = "")
       names(first_file)[1]<-paste("gene")
       num_bins <- dim(first_file)
-      gene_names <- c(GENE_LISTS[[1]][[1]], unique(first_file[,1]))
       if(file_count > 0){
         if(num_bins[2] - 1 != length(FILE_LIST[[1]]) - 1){
           close(pb)
@@ -122,9 +126,10 @@ GetTableFile <- function(...) {
           tcl("wm", "attributes", root, topmost=TRUE)
           return(FALSE)
         }
+        gene_names <- c(GENE_LISTS$main$common, unique(first_file[,1]))
         gene_names <- gene_names[duplicated(gene_names)]
         if(length(gene_names) > 0){
-          GENE_LISTS[[1]][[1]] <<- gene_names
+          GENE_LISTS$main$common <<- gene_names
         }else{
           close(pb)
           tkmessageBox(message = "Can't load file, no genes in common or remake your 
@@ -133,19 +138,21 @@ GetTableFile <- function(...) {
           tcl("wm", "attributes", root, topmost=TRUE)
           return(FALSE)
         }
-      }else{
+      }else{ # first time setting it up
+        
         #tkdelete(stop_box, 0, 'end')
         #tkinsert(stop_box, "end", num_bins[2] - 1)
-        GENE_LISTS[[1]][[1]] <<- gene_names
+        GENE_LISTS$main$common <<- unique(first_file[,1])
       }
       file_count <- file_count + 1
       FILE_LIST_INFO[[file_count]] <<- c(file_name, paste(" NA's = ", 
                                                           sum(is.na(first_file))), 
                                                paste(" Zeors = ", 
                                                      sum(first_file==0, na.rm = TRUE)))
-      GENE_LIST_INFO[[1]][[file_count]] <<- c(ld_name, legend_name,
-                                               my_dotlist[1], my_linelist[1], 
-                                               MY_COLORS[[tclvalue(tkget(color_sets))]][file_count], 1)
+      GENE_LIST_INFO$main[ld_name] <<- list(c(ld_name, legend_name, my_dotlist[1], 
+                                              my_linelist[1],
+                                              MY_COLORS[[tclvalue(tkget(color_sets))]][file_count], 
+                                              1))
       first_file[is.na(first_file)] <- 0
       FILE_LIST[[file_count]] <<- first_file
     }
@@ -160,17 +167,10 @@ GetTableFile <- function(...) {
 # After file is loaded comboboxes are added to and set
 GetTableFileHelper <- function(...){
   if(GetTableFile()){
-    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO[[1]], "[[", 1), state="active")
-    tkconfigure(cbb_file, textvariable=tclVar(last(sapply(GENE_LIST_INFO[[1]], "[[", 1))))
+    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1), state="active")
+    tkconfigure(cbb_file, textvariable=tclVar(last(sapply(GENE_LIST_INFO$main, "[[", 1))))
     tkdelete(full_name2, 0, "end")
     tkinsert(full_name2, 0, tkget(cbb_file))
-    #change to add to plot list
-    #assign(last(sapply(GENE_LIST_INFO[[1]], "[[", 6)),tclVar("1"),pos=1)
-    #assign(last(sapply(GENE_LIST_INFO[[1]], "[[", 1)), 
-    #         tkcheckbutton(cgtabbox1,text= last(sapply(GENE_LIST_INFO[[1]], "[[", 1)),
-     #                      variable=get(last(sapply(GENE_LIST_INFO[[1]], "[[", 6)))),
-      #                     pos=1)
-    #tkgrid(get(last(sapply(GENE_LIST_INFO[[1]], "[[", 1))))
     cbb_configure()
   }
 }
@@ -185,14 +185,14 @@ MakeDataFrame <- function(){
     use_line <- NULL
     use_name <- NULL
     wide_list <- list(NULL)
-    for(i in seq_along(GENE_LISTS)){
+    for(i in names(GENE_LISTS)){
       if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){
         return()
       }else{
         enesg <- data.frame(gene=GENE_LISTS[[i]][[1]])
         lapply(seq_along(FILE_LIST), function(k) 
           if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){          
-            inner_join(enesg, FILE_LIST[[k]], by = "gene") ->> wide_list[[k]]
+            wide_list[[k]] <<- inner_join(enesg, FILE_LIST[[k]], by = "gene")
             use_col <<- c(use_col, GENE_LIST_INFO[[i]][[k]][5])
             use_dot <<- c(use_dot, GENE_LIST_INFO[[i]][[k]][3])
             use_line <<- c(use_line, GENE_LIST_INFO[[i]][[k]][4])
@@ -209,11 +209,10 @@ MakeDataFrame <- function(){
 
 # Applys math to long list ... TODO
 ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
-  lapply(seq_along(wide_list), function(i) 
+  math_list <- lapply(seq_along(wide_list), function(i) 
     data.frame(bin=(seq_along(wide_list[[i]][-1])), 
                set=(as.character(use_name[i])), 
-               value=colSums(wide_list[[i]][,-1], na.rm=TRUE))) -> math_list
-  print(summary(math_list[[1]])) # remove factors
+               value=colSums(wide_list[[i]][,-1], na.rm=TRUE),stringsAsFactors = FALSE)) 
   long_list <- rbind_all(math_list)
   GGplotF(long_list, use_col, use_dot, use_line)
 }
@@ -221,13 +220,12 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
 # ggplot function
 GGplotF <- function(long_list, use_col, use_dot, use_line){
   main <- "header" #TODO
-  
-  ggplot(long_list, aes(x=bin, y=value, group=set, color=set, shape=set)) + 
-    # Use larger points, fill with white
+  gp <- ggplot(long_list, aes(x=bin, y=value, group=set, color=set, shape=set)) +
+  # Use larger points, fill with white
     geom_line(size=2) + geom_point(size=4, fill="white") +  
     #ylim(0, 0.0009) +             # Set y range
-    scale_color_manual(name="Sample", values=use_col)+
-    scale_shape_manual(name="Sample", values=c(22,21)) +      # Use points with a fill color
+    scale_color_manual(name="", values=use_col)+
+    #scale_shape_manual(name="", values=c(22,21)) +      # Use points with a fill color
     xlab("Bins") + ylab("mean of bin counts") + # Set axis labels
     ggtitle(main) +  # Set title
     scale_x_continuous( breaks=c(10,20,30,70),
@@ -235,8 +233,7 @@ GGplotF <- function(long_list, use_col, use_dot, use_line){
     theme_bw() +
     #theme(legend.position=c(.9,.85))+   # Position legend inside and This must go after theme_bw
     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 1, face = 'bold'))
-  
-  
+ print(gp)
   
 }
 
@@ -247,10 +244,10 @@ GGplotF <- function(long_list, use_col, use_dot, use_line){
 cbb_configure <- function(){
   num <- as.numeric(tclvalue(tcl(cbb_file,"current")))+1
   if(!is.null(FILE_LIST[[1]]) & num > 0 & STATE[3] == 0){
-    tkconfigure(cbb_color, textvariable=tclVar(sapply(GENE_LIST_INFO[[1]], "[[", 5)[num]))
-    tkconfigure(cbb_line, textvariable=tclVar(sapply(GENE_LIST_INFO[[1]], "[[", 4)[num]))
-    tkconfigure(cbb_dot, textvariable=tclVar(sapply(GENE_LIST_INFO[[1]], "[[", 3)[num]))
-    tkconfigure(new_name, textvariable=tclVar(sapply(GENE_LIST_INFO[[1]], "[[", 2)[num]))
+    tkconfigure(cbb_color, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 5)[num]))
+    tkconfigure(cbb_line, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 4)[num]))
+    tkconfigure(cbb_dot, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 3)[num]))
+    tkconfigure(new_name, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 2)[num]))
     tkconfigure(stats_list, listvariable = 
                   tclVar(as.character(FILE_LIST_INFO[[num]][2:3])))
   } 
@@ -260,10 +257,10 @@ cbb_configure <- function(){
 cbb_setvalues <- function(){
   num <- as.numeric(tclvalue(tcl(cbb_file,"current")))+1
   if(!is.null(FILE_LIST[[1]]) & num > 0 & STATE[3] == 0){
-    GENE_LIST_INFO[[1]][[num]][5] <<- tclvalue(tkget(cbb_color))
-    GENE_LIST_INFO[[1]][[num]][4] <<- tclvalue(tkget(cbb_line))
-    GENE_LIST_INFO[[1]][[num]][3] <<- tclvalue(tkget(cbb_dot))
-    GENE_LIST_INFO[[1]][[num]][2] <<- tclvalue(tkget(new_name))
+    GENE_LIST_INFO$main[[num]][5] <<- tclvalue(tkget(cbb_color))
+    GENE_LIST_INFO$main[[num]][4] <<- tclvalue(tkget(cbb_line))
+    GENE_LIST_INFO$main[[num]][3] <<- tclvalue(tkget(cbb_dot))
+    GENE_LIST_INFO$main[[num]][2] <<- tclvalue(tkget(new_name))
     
   } 
 }
@@ -277,7 +274,7 @@ cbb_colorsets <- function(){
   if(STATE[3] == 0){
     tkconfigure(cbb_color, 
                 textvariable=tclVar(MY_COLORS[[tclvalue(tkget(color_sets))]][num]))
-    GENE_LIST_INFO[[1]][[num]][5] <<- tclvalue(tkget(cbb_color))
+    GENE_LIST_INFO$main[[num]][5] <<- tclvalue(tkget(cbb_color))
   }
 }
 
@@ -352,14 +349,14 @@ tkinsert(full_name1, 0, "File:")
 full_name2 <- tklistbox(tab1box2, height = 1, width = 35, relief = 'flat', 
                          background = 'gray93')
 tkgrid(full_name2, column = 1, row = 1, sticky = "w", padx = c(0, 4)) 
-tkinsert(full_name2, 0, paste(GENE_LIST_INFO[[1]][1]))
+tkinsert(full_name2, 0, paste(GENE_LIST_INFO$main[1]))
  
 tkgrid(tklistbox(tab1box2, listvariable = tclVar("nickname:"), height = 1, width = 10, 
                  relief = 'flat', background = 'gray93'), padx = c(20, 0))
 
 new_name <- tk2entry(tab1box2, width = 35)
 tkgrid(new_name, sticky = "w", column = 1, row = 2, padx = c(0, 4))
-tkinsert(new_name, 0,  paste(GENE_LIST_INFO[[1]][1]))
+tkinsert(new_name, 0,  paste(GENE_LIST_INFO$main[1]))
 tkbind(new_name, "<Leave>", cbb_setvalues)
 
 tkgrid(tklistbox(tab1box2, listvariable = tclVar("Line"), height = 1, width = 4, 
@@ -388,7 +385,7 @@ tkbind(cbb_color, "<<ComboboxSelected>>", cbb_setvalues)
 tkgrid(tab1box2, column = 1, row = 0)
 
 # tab plot ----
-tk2notetab.select(nb, "Plot") #remove when done
+
 
 # legends, ylim, ...
 
@@ -404,7 +401,7 @@ tkgrid(tkbutton(tab2box1, font =c('bold', 23), text = '      Plot       ',
 
 cbb_math <- tk2combobox(tab2box1, value = my_math, state="readonly")
 tkgrid(cbb_math, sticky = "n")
-#tkbind(cbb_math, "<<ComboboxSelected>>", cbb_configure)
+tkbind(cbb_math, "<<ComboboxSelected>>", onOK)
 tkconfigure(cbb_math, textvariable = mm)
 
 cb_rf <- tkcheckbutton(tab2box1, text = "Relative Frequency" )
