@@ -27,8 +27,8 @@ my_dotlist <- c("circle", "triangle point up", "plus", "cross", "diamond",
                 "filled triangle point up", "filled diamond", "solid circle", 
                 "bullet (smaller circle)", "square")
 my_linelist <- c("solid line", "dashed line", "dotted line", "dot dash line", 
-                 "long dash line", "two dash line", "split line")
-MY_COLORS <- list("colorset1" = c("yellow", "blue", "green", "red", "orange", "purple", rep("black",10)),
+                 "long dash line", "two dash line", "No line")
+MY_COLORS <- list("colorset1" = c("blue", "green", "red", "orange", "purple", "yellow", rep("black",10)),
                   "colorset2" = c("red", "orange", "purple", "yellow", "blue", "green", rep("black",10)))
 my_math <- c(" mean", " sum", " median")
 Legend_loc <- c("outside", "topright", "top", "topleft", "bottomright", "bottom", "bottomleft", "right", "left", "No legend")
@@ -175,27 +175,36 @@ GetTableFileHelper <- function(...){
 
 # plotting chunck ----
 
-# Makes data frame for plotting 
+# Makes data frame and gathers plot settings for plotting active samples
 MakeDataFrame <- function(){
   if(STATE[3] == 1 | is.null(names(FILE_LIST))){
     return()
-    }else{
+  }else{
+    tk2notetab.select(nb, "Plot")
     use_col <- NULL
     use_dot <- NULL
     use_line <- NULL
     use_name <- NULL
     wide_list <- list()
     for(i in names(GENE_LISTS)){
-      if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){
+      if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){ # checks to see if at least one in list is acitve
         return()
       }else{
         enesg <- data.frame(gene=GENE_LISTS[[i]][[1]])
         lapply(names(FILE_LIST), function(k) 
-          if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){          
+          if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){  # uses only acive lists        
             wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"))
+            dot <- which(my_dotlist == GENE_LIST_INFO[[i]][[k]][3])
+            if(dot == 21){
+              dot <- 0
+            }
+            line <- which(my_linelist == GENE_LIST_INFO[[i]][[k]][4])
+            if(line > 6){
+              line <- 0
+            }
             use_col <<- c(use_col, GENE_LIST_INFO[[i]][[k]][5])
-            use_dot <<- c(use_dot, GENE_LIST_INFO[[i]][[k]][3])
-            use_line <<- c(use_line, GENE_LIST_INFO[[i]][[k]][4])
+            use_dot <<- c(use_dot, dot)
+            use_line <<- c(use_line, line)
             use_name <<- c(use_name, GENE_LIST_INFO[[i]][[k]][2])
           }
         )
@@ -219,15 +228,16 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
 
 # ggplot function
 GGplotF <- function(long_list, use_col, use_dot, use_line){
-  main <- "header" #TODO
-  gp <- ggplot(long_list, aes(x=bin, y=value, group=set, color=set, shape=set)) +
+  print(use_dot)
+  gp <- ggplot(long_list, aes(x=bin, y=value, group=set, color=set, shape=set, linetype=set)) +
   # Use larger points, fill with white
-    geom_line(size=2) + geom_point(size=4, fill="white") +  
+    geom_line(size=1.5) + geom_point(size=4) +  
     #ylim(0, 0.0009) +             # Set y range
     scale_color_manual(name="Sample", values=use_col)+
-    scale_shape_manual(name="Sample", values=c(22,21)) +      # Use points with a fill color
+    scale_shape_manual(name="Sample", values=use_dot) + 
+    scale_linetype_manual(name="Sample", values=use_line)+
     xlab("Bins") + ylab("mean of bin counts") + # Set axis labels
-    ggtitle(main) +  # Set title
+    ggtitle(tclvalue(Header)) +  # Set title
     scale_x_continuous( breaks=c(10,20,30,70),
                         minor_breaks=seq(50,60,by=2) )+
     theme_bw() +
@@ -290,14 +300,13 @@ cbb_colorsets <- function(){
 
 # GUI function ----
 
-# set up root window  
+# set up root window ---- 
 
 root <- tktoplevel() #container for it all
-STATE[4] <- 1
 tcl("wm", "attributes", root, topmost = TRUE)
 tkwm.title(root, my_version_num)
 
-# menu setup
+# menu setup ----
 topMenu <- tkmenu(root)           # Create a menu
 tkconfigure(root, menu = topMenu) # Add it to the main window
 fileMenu <- tkmenu(topMenu, tearoff = FALSE)
@@ -394,6 +403,13 @@ cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(color_sets)
 tkgrid(cbb_color, sticky = "w", column = 1, row = 5, padx = c(0, 16)) 
 tkbind(cbb_color, "<<ComboboxSelected>>", cbb_setvalues)
 tkgrid(tab1box2, column = 1, row = 0)
+
+# frame for plot button to switch to plot tab and plot
+
+tab1box3 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
+tkgrid(tkbutton(tab1box3, font =c('bold', 23), text = '      Plot       ', 
+                command = function() MakeDataFrame())) 
+tkgrid(tab1box3, column = 0, row = 1)
 
 # tab plot ----
 
