@@ -31,7 +31,6 @@ my_linelist <- c("solid line", "dashed line", "dotted line", "dot dash line",
 MY_COLORS <- list("colorset1" = c("blue", "green", "red", "orange", "purple", "yellow", rep("black",10)),
                   "colorset2" = c("red", "orange", "purple", "yellow", "blue", "green", rep("black",10)))
 my_math <- c(" mean", " sum", " median")
-Legend_loc <- c("outside", "topright", "top", "topleft", "bottomright", "bottom", "bottomleft", "right", "left", "No legend")
 plot_lines <- c("543 bins 20,20,40", "5 1.5k-2k 70 bins", "543 bins 10,10,10", "543 bins 20,20,20", "5 .5k-1.5k")
 
 # tcl starting values ----
@@ -44,14 +43,7 @@ start_color <- tclVar(MY_COLORS[[1]][1])
 start_math <- tclVar(my_math[1])
 nbin <- tclVar("0")
 cbvalue_rf <- tclVar(0)
-Lloc <- tclVar(Legend_loc[4])
-Legend_size <- tclVar(0.8)
-Header <- tclVar('Header')
-Header_size <- tclVar(2.0)
-ylable <- tclVar('Y Label')
-xlable <- tclVar('X Label')
-ylable_size <- tclVar(1.7)
-xlable_size <- tclVar(1.7)
+Header <- tclVar('')
 Txt_one <- tclVar('TSS')
 Txt_two <- tclVar('PolyA')
 Txt_three <- tclVar('500')
@@ -218,17 +210,27 @@ MakeDataFrame <- function(){
 
 # Applys math to long list
 ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
+  R_my_math <- as.character(tclvalue(tkget(cbb_math)))
+  if(R_my_math == " mean"){
+    my_apply <- function(x) colMeans(x, na.rm = TRUE)
+    y_lab <- "Mean of bin counts"
+  } else if (R_my_math == " sum"){
+    my_apply <- function(x) colSums(x, na.rm = TRUE)
+    y_lab <- "Sum of bin counts"
+  } else if (R_my_math == " median"){
+    my_apply <- function(x) apply(x, 2, median, na.rm = TRUE)
+    y_lab <- "Median of bin counts"
+  } 
   math_list <- lapply(seq_along(wide_list), function(i) 
     data.frame(bin=(seq_along(wide_list[[i]][-1])), 
                set=(as.character(use_name[i])), 
-               value=colSums(wide_list[[i]][,-1], na.rm=TRUE),stringsAsFactors = FALSE)) 
+               value=my_apply(wide_list[[i]][,-1]), stringsAsFactors = FALSE)) 
   long_list <- rbind_all(math_list)
-  GGplotF(long_list, use_col, use_dot, use_line)
+  GGplotF(long_list, use_col, use_dot, use_line, y_lab)
 }
 
 # ggplot function
-GGplotF <- function(long_list, use_col, use_dot, use_line){
-  print(use_dot)
+GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab){
   gp <- ggplot(long_list, aes(x=bin, y=value, group=set, color=set, shape=set, linetype=set)) +
   # Use larger points, fill with white
     geom_line(size=1.5) + geom_point(size=4) +  
@@ -236,13 +238,15 @@ GGplotF <- function(long_list, use_col, use_dot, use_line){
     scale_color_manual(name="Sample", values=use_col)+
     scale_shape_manual(name="Sample", values=use_dot) + 
     scale_linetype_manual(name="Sample", values=use_line)+
-    xlab("Bins") + ylab("mean of bin counts") + # Set axis labels
+    xlab("Bins") + ylab(y_lab) + # Set axis labels
     ggtitle(tclvalue(Header)) +  # Set title
     scale_x_continuous( breaks=c(10,20,30,70),
                         minor_breaks=seq(50,60,by=2) )+
     theme_bw() +
-    #theme(legend.position=c(.9,.85))+   # Position legend inside and This must go after theme_bw
-    theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 1, face = 'bold'))
+    theme(plot.title = element_text(size = 30, vjust = 2))+
+    theme(axis.title.y = element_text(size =  20, vjust = 1.5))+
+    theme(axis.title.x = element_text(size =  25, vjust = 0))+
+    theme(axis.text.x = element_text(size = 15, hjust = .5, vjust = 1, face = 'bold'))
  print(gp)
   
 }
@@ -429,7 +433,6 @@ tkgrid(tkbutton(tab2box1, font =c('bold', 23), text = '      Plot       ',
 
 cbb_math <- tk2combobox(tab2box1, value = my_math, state="readonly")
 tkgrid(cbb_math, sticky = "n")
-tkbind(cbb_math, "<<ComboboxSelected>>", onOK)
 tkconfigure(cbb_math, textvariable = start_math)
 
 cb_rf <- tkcheckbutton(tab2box1, text = "Relative Frequency" )
@@ -454,51 +457,11 @@ tab2box1_1 <- tkframe(plottab, relief='ridge', borderwidth = 5)
 tkgrid(tklabel(tab2box1_1, text = ' Plot Options ', width = 30), padx = c(5, 3), 
        pady = c(0, 2), columnspan = 6)
 
-tkgrid(tk2combobox(tab2box1_1, state = "readonly", textvariable = Lloc, width = 17, 
-                   values = Legend_loc), padx = c(5, 0), pady = c(0, 2), sticky = "e", 
-       columnspan = 3)
-tkgrid(tklabel(tab2box1_1, text = 'Size '), padx = c(5, 3), pady = c(0, 2), 
-       column = 3, row = 1, sticky = "w")
-tkgrid(tkwidget(tab2box1_1, type ="spinbox", from =0.1, to = 1, inc=0.1,
-                width = 3, textvariable = Legend_size), padx = c(0, 10), 
-       pady = c(0, 2), column = 4, row = 1, sticky = "w")
 
 tkgrid(tk2entry(tab2box1_1, width = 20, textvariable = Header),  
        padx = c(5, 0), pady = c(0, 2), column = 0, row = 2, sticky = "e", columnspan = 3)
-tkgrid(tklabel(tab2box1_1, text = 'Size '), padx = c(5, 3), pady = c(0, 2), 
-       column = 3, row = 2, sticky = "w")
-tkgrid(tkwidget(tab2box1_1, type ="spinbox", from =1, to = 4, inc=0.5, width = 3,
-                textvariable = Header_size), padx = c(0, 10), pady = c(0, 2), column = 4, 
-       row = 2, sticky =  "w")
 
-tkgrid(tk2entry(tab2box1_1, width = 20, textvariable = xlable), padx = c(5, 0), 
-       pady = c(0, 2), column = 0, row = 3, sticky = "e", columnspan = 3)
-tkgrid(tklabel(tab2box1_1, text = 'Size '), padx = c(5, 3), pady = c(0, 2), 
-       column = 3, row = 3, sticky = "w")
-tkgrid(tkwidget(tab2box1_1, type ="spinbox", from =0.1, to = 3, inc=0.2, width = 3,
-                textvariable = xlable_size), padx = c(0, 10), pady = c(0, 0), column = 4, 
-       row = 3, sticky ="w")
-
-tkgrid(tk2entry(tab2box1_1, width = 20, textvariable = ylable),  
-       padx = c(5, 0), pady = c(0, 2), column = 0, row = 4, sticky = "e", columnspan = 3)
-tkgrid(tklabel(tab2box1_1, text = 'Size '), padx = c(5, 3), pady = c(0, 2), 
-       column = 3, row = 4, sticky = "w")
-tkgrid(tkwidget(tab2box1_1, type ="spinbox", from =0.1, to = 3, inc=0.2, width = 3, 
-                textvariable = ylable_size), padx = c(0, 10), pady = c(0, 2), column = 4,
-       row =  4, sticky = "w")
-
-cb_ylim <- tkcheckbutton(tab2box1_1)
-tkconfigure(cb_ylim, variable = cbValue_ylim)
-tkgrid(tklabel(tab2box1_1, text = 'Set Y axis?'), padx = c(5, 0), pady = c(0, 0), 
-       column = 1, row = 5, sticky = "e", rowspan = 2)
-tkgrid(cb_ylim, padx = c(5, 0), pady = c(0, 0), column = 2, row = 5, rowspan = 2, 
-       sticky = "w")
-max_ylim_box <- tk2entry(tab2box1_1, width = 6, textvariable = max_ylim)
-tkgrid(max_ylim_box, padx = c(5, 0), pady = c(0, 0), column = 3, row = 5, sticky = "ws")
-min_ylim_box <- tk2entry(tab2box1_1, width = 6, textvariable = min_ylim)
-tkgrid(min_ylim_box, padx = c(5, 0), pady = c(0, 5), column = 3, row = 6, sticky = "nw")
-
-tkgrid(tklabel(tab2box1_1, text = "Plot lines and lables"), pady = c(5, 5), 
+tkgrid(tklabel(tab2box1_1, text = "Plot lines and lables"), pady = c(5, 5), row = 7,
        column = 0, columnspan = 3)
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_one),  
