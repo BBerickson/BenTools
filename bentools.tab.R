@@ -41,8 +41,7 @@ start_line_list <- tclVar(my_linelist[1])
 start_dot_list <- tclVar(my_dotlist[1])
 start_color <- tclVar(MY_COLORS[[1]][1])
 start_math <- tclVar(my_math[1])
-nbin <- tclVar("0")
-cbvalue_rf <- tclVar(0)
+cbbVar_nbin <- tclVar(0)
 Header <- tclVar('')
 Txt_one <- tclVar('TSS')
 Txt_two <- tclVar('PolyA')
@@ -53,9 +52,9 @@ Pos_one <- tclVar(15.5)
 Pos_two <- tclVar(45.5)
 Pos_three <- tclVar(20.5)
 Pos_four <- tclVar(40.5)
-Pos_five <- tclVar(c(1, 5, 10, 50, 55, 60, 65, 70, 75, 80))
-cbValue_lable <- tclVar("1")
-
+Pos_five <- tclVar(c(1, 6, 11, 50, 55, 60, 65, 70, 75, 80))
+cbVar_relative_frequency <- tclVar(0)
+cbVar_log2 <- tclVar(0)
 
 # functions ----
 
@@ -66,7 +65,6 @@ onOK <- function(){
 
 # keep numbers, empty string for the rest
 # from https://github.com/gsk3/taRifx/blob/master/R/Rfunctions.R#L1161
-
 destring <- function(x,keep="0-9.-") {
   return(as.numeric(gsub(paste("[^",keep,"]+",sep=""),"",x)))
 }
@@ -131,8 +129,7 @@ GetTableFile <- function(...) {
         }
       }else{ # first time setting it up
         
-        #tkdelete(stop_box, 0, 'end')
-        #tkinsert(stop_box, "end", num_bins[2] - 1)
+        tkconfigure(cbb_nbin, values=c(0:(num_bins[2] - 1)))
         GENE_LISTS$main$common <<- unique(first_file[,1])
       }
       file_count <- file_count + 1
@@ -174,14 +171,17 @@ MakeDataFrame <- function(){
     use_dot <- NULL
     use_line <- NULL
     use_name <- NULL
+    tk2notetab.select(nb, "Plot")
     wide_list <- list()
     for(i in names(GENE_LISTS)){
-      if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){ # checks to see if at least one in list is acitve
+      # checks to see if at least one in list is acitve
+      if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){ 
         return()
       }else{
         enesg <- data.frame(gene=GENE_LISTS[[i]][[1]])
         lapply(names(FILE_LIST), function(k) 
-          if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){  # uses only acive lists        
+          # uses only acive lists  
+          if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){        
             wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"))
             dot <- which(my_dotlist == GENE_LIST_INFO[[i]][[k]][3])
             if(dot == 21){
@@ -207,6 +207,8 @@ MakeDataFrame <- function(){
 
 # Applys math to long list
 ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
+  
+  # math set and y lable
   R_my_math <- as.character(tclvalue(tkget(cbb_math)))
   if(R_my_math == " mean"){
     my_apply <- function(x) colMeans(x, na.rm = TRUE)
@@ -218,10 +220,34 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
     my_apply <- function(x) apply(x, 2, median, na.rm = TRUE)
     y_lab <- "Median of bin counts"
   } 
+  
+  # set normilization to relative frequency or bin number or 1 for none, update y lable
+  cbValue_relative_frequency <- as.character(tclvalue(cbVar_relative_frequency))
+  RValue_norm_bin <- as.numeric(tclvalue(cbbVar_nbin))
+  
+  if(cbValue_relative_frequency == 1 & RValue_norm_bin == 0){
+    y_lab <- paste(strsplit(y_lab, split = " ")[[1]][1], "bins : Relative Frequency")
+    normz <- lapply(seq_along(wide_list), function(i) sum(my_apply(wide_list[[i]][,-1])))
+  } else if(RValue_norm_bin > 0){
+    if(cbValue_relative_frequency == 1){
+      cbVar_relative_frequency <<- tclVar(0)
+      tkconfigure(cb_rf, variable = cbVar_relative_frequency)
+    }
+    y_lab <- paste(strsplit(y_lab, split = " ")[[1]][1], "bins : Normalize to bin ", RValue_norm_bin)
+    normz <- as.numeric(lapply(seq_along(wide_list), 
+                    function(i) my_apply(wide_list[[i]][,-1])[RValue_norm_bin]))
+  } else {
+    normz <- lapply(seq_along(wide_list) ,function(i) 1)
+  }
+  
+  # update y lable if log2
+  if(tclvalue(cbVar_log2) == 1){
+    y_lab <- paste("log2(",y_lab,")", sep = "")
+  }
   math_list <- lapply(seq_along(wide_list), function(i) 
     data.frame(bin=(seq_along(wide_list[[i]][-1])), 
                set=(as.character(use_name[i])), 
-               value=my_apply(wide_list[[i]][,-1]), stringsAsFactors = FALSE)) 
+               value=my_apply(wide_list[[i]][,-1])/normz[[i]], stringsAsFactors = FALSE)) 
   long_list <- rbind_all(math_list)
   
   Pfive <- destring(unlist(strsplit(tclvalue(Pos_five), " ")))
@@ -246,8 +272,15 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
 
 # ggplot function
 GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my_xlab){
-  gp <- ggplot(long_list, aes(x=bin, y=value, group=set, color=set, shape=set, linetype=set)) +
+  if(tclvalue(cbVar_log2) == 1){
+    gp <- ggplot(long_list, aes(x=bin, y=log2(value), group=set, color=set, 
+                              shape=set, linetype=set))
+  }else{
+    gp <- ggplot(long_list, aes(x=bin, y=value, group=set, color=set, 
+                                shape=set, linetype=set))
+  }
   # Use larger points, fill with white
+  gp <- gp +
     geom_line(size=1.5) + geom_point(size=4) +  
     #ylim(0, 0.0009) +             # Set y range
     scale_color_manual(name="Sample", values=use_col)+
@@ -261,10 +294,9 @@ GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my
     theme(plot.title = element_text(size = 30, vjust = 2))+
     theme(axis.title.y = element_text(size =  20, vjust = 1.5))+
     theme(axis.title.x = element_text(size =  25, vjust = 0))+
-    theme(axis.text.x = element_text(size = 10, angle = -45, hjust = .1, vjust = .8, face = 'bold'))
+    theme(axis.text.x = element_text(size = 10, angle = -45, hjust = .1, 
+                                     vjust = .8, face = 'bold'))
  print(gp)
-
-  
 }
 
 # translates dot and line chr to number
@@ -451,17 +483,18 @@ cbb_math <- tk2combobox(tab2box1, value = my_math, state="readonly")
 tkgrid(cbb_math, sticky = "n")
 tkconfigure(cbb_math, textvariable = start_math)
 
-cb_rf <- tkcheckbutton(tab2box1, text = "Relative Frequency" )
+cb_rf <- tkcheckbutton(tab2box1, variable = cbVar_relative_frequency, 
+                       text = "Relative Frequency" )
 tkgrid(cb_rf)
 
-cb_log2 <- tkcheckbutton(tab2box1, text = "log2 transformation" )
+cb_log2 <- tkcheckbutton(tab2box1, variable = cbVar_log2, text = "log2 transformation" )
 tkgrid(cb_log2)
 
 tkgrid(tklistbox(tab2box1, listvariable = tclVar("Norm_to_bin"), height = 1, width = 12, 
                  relief = 'flat', background = 'gray93'), padx = c(50, 0), sticky = "w")
 
-cbb_nb <- tk2combobox(tab2box1, textvariable = nbin, state="readonly", width = 3)
-tkgrid(cbb_nb, sticky = "e", column = 0, row = 5, padx = c(0, 50)) 
+cbb_nbin <- tk2combobox(tab2box1, textvariable = cbbVar_nbin, state="readonly", width = 3)
+tkgrid(cbb_nbin, sticky = "e", column = 0, row = 5, padx = c(0, 50)) 
 #tkbind(cbb_nb, "<<ComboboxSelected>>", )
 
 tkgrid(tab2box1, row = 0, sticky = "n")
