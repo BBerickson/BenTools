@@ -48,28 +48,27 @@ Txt_one <- tclVar('TSS')
 Txt_two <- tclVar('PolyA')
 Txt_three <- tclVar('500')
 Txt_four <- tclVar('500')
-Txt_five <- tclVar('-1450')
-Txt_six <- tclVar('+3450')
-Txt_seven <- tclVar('')
-Txt_eight <- tclVar('')
+Txt_five <- tclVar('-1450 -950 -450 +450 +950 +1450 +1950 +2450 +2950 +3450')
 Pos_one <- tclVar(15.5)
 Pos_two <- tclVar(45.5)
 Pos_three <- tclVar(20.5)
 Pos_four <- tclVar(40.5)
-Pos_five <- tclVar(1)
-Pos_six <- tclVar(80)
-Pos_seven <- tclVar(0)
-Pos_eight <- tclVar(0)
-cbValue_ylim <- tclVar("0")
+Pos_five <- tclVar(c(1, 5, 10, 50, 55, 60, 65, 70, 75, 80))
 cbValue_lable <- tclVar("1")
-max_ylim <- tclVar('')
-min_ylim <- tclVar('')
+
 
 # functions ----
 
 # test function 
 onOK <- function(){
   print("this works")
+}
+
+# keep numbers, empty string for the rest
+# from https://github.com/gsk3/taRifx/blob/master/R/Rfunctions.R#L1161
+
+destring <- function(x,keep="0-9.-") {
+  return(as.numeric(gsub(paste("[^",keep,"]+",sep=""),"",x)))
 }
 
 # reads in file, tests, fills out info 
@@ -155,7 +154,6 @@ GetTableFile <- function(...) {
   }
 }
 
-
 # After file is loaded comboboxes are added to and set
 GetTableFileHelper <- function(...){
   if(GetTableFile()){
@@ -172,7 +170,6 @@ MakeDataFrame <- function(){
   if(STATE[3] == 1 | is.null(names(FILE_LIST))){
     return()
   }else{
-    tk2notetab.select(nb, "Plot")
     use_col <- NULL
     use_dot <- NULL
     use_line <- NULL
@@ -226,11 +223,29 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
                set=(as.character(use_name[i])), 
                value=my_apply(wide_list[[i]][,-1]), stringsAsFactors = FALSE)) 
   long_list <- rbind_all(math_list)
-  GGplotF(long_list, use_col, use_dot, use_line, y_lab)
+  
+  Pfive <- destring(unlist(strsplit(tclvalue(Pos_five), " ")))
+  Tfive <- unlist(strsplit(tclvalue(Txt_five), " "))
+  if(length(Tfive) != length(Pfive)){
+    tkmessageBox(message = "The number of Positions and Lables are unequal")
+    return()
+  }
+  
+  
+  my_xbreaks <- c(destring(tclvalue(Pos_one)), destring(tclvalue(Pos_two)), 
+                  destring(tclvalue(Pos_three)), destring(tclvalue(Pos_four)),
+                  Pfive)
+  
+  my_xlab <- c(tclvalue(Txt_one), tclvalue(Txt_two),tclvalue(Txt_three),tclvalue(Txt_four),
+               Tfive)
+
+  my_xlab <- my_xlab[!is.na(my_xbreaks)]
+  my_xbreaks <- my_xbreaks[!is.na(my_xbreaks)]
+  GGplotF(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my_xlab)
 }
 
 # ggplot function
-GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab){
+GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my_xlab){
   gp <- ggplot(long_list, aes(x=bin, y=value, group=set, color=set, shape=set, linetype=set)) +
   # Use larger points, fill with white
     geom_line(size=1.5) + geom_point(size=4) +  
@@ -240,14 +255,15 @@ GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab){
     scale_linetype_manual(name="Sample", values=use_line)+
     xlab("Bins") + ylab(y_lab) + # Set axis labels
     ggtitle(tclvalue(Header)) +  # Set title
-    scale_x_continuous( breaks=c(10,20,30,70),
-                        minor_breaks=seq(50,60,by=2) )+
+    scale_x_continuous(breaks = my_xbreaks, labels = my_xlab)+
+    geom_vline(xintercept = my_xbreaks[1:4])+
     theme_bw() +
     theme(plot.title = element_text(size = 30, vjust = 2))+
     theme(axis.title.y = element_text(size =  20, vjust = 1.5))+
     theme(axis.title.x = element_text(size =  25, vjust = 0))+
-    theme(axis.text.x = element_text(size = 15, hjust = .5, vjust = 1, face = 'bold'))
+    theme(axis.text.x = element_text(size = 10, angle = -45, hjust = .1, vjust = .8, face = 'bold'))
  print(gp)
+
   
 }
 
@@ -459,70 +475,55 @@ tkgrid(tklabel(tab2box1_1, text = ' Plot Options ', width = 30), padx = c(5, 3),
 
 
 tkgrid(tk2entry(tab2box1_1, width = 20, textvariable = Header),  
-       padx = c(5, 0), pady = c(0, 2), column = 0, row = 2, sticky = "e", columnspan = 3)
+       padx = c(5, 0), pady = c(0, 2), column = 1, row = 2, sticky = "w", columnspan = 5)
+tkgrid(tklabel(tab2box1_1, text = "  Header"), padx = c(5,1), pady = c(0, 2), row = 2,
+       column = 0)
 
 tkgrid(tklabel(tab2box1_1, text = "Plot lines and lables"), pady = c(5, 5), row = 7,
-       column = 0, columnspan = 3)
+       column = 0, columnspan = 6)
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_one),  
-       padx = c(10, 0), pady = c(5, 0))
+       padx = c(10, 0), pady = c(5, 0), column = 0, row = 8)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 0), column = 1, 
        row = 8, sticky = "w")
 tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_one), column = 2, row = 8,
        sticky = "w", padx = c(0, 10), pady = c(5, 0))
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_two),  
-       padx = c(10, 0), pady = c(3, 0))
+       padx = c(10, 0), pady = c(3, 0), column = 0, row = 9)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(3, 0), column = 1,
        row = 9, sticky = "w")
-tkgrid(tkentry(tab2box1_1, width = 4, textvariable = Pos_two), column = 2 , row = 9, 
+tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_two), column = 2 , row = 9, 
        sticky = "w", padx = c(0, 10), pady = c(3, 0))
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_three),  
-       padx = c(10, 0), pady = c(3, 0))
-tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(3, 0), column = 1,
-       row = 10, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_three), column = 2, row = 10,
-       sticky = "w", padx = c(0, 10), pady = c(3, 0))
-
-tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_four),  
-       padx = c(10, 0), pady = c(3, 4))
-tkgrid(tklabel(tab2box1_1, text = 'Pos'), column = 1, row =11, sticky = "w",
-       padx = c(5, 3), pady = c(3, 4))
-tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_four), column = 2, row = 11,
-       sticky = "w", padx = c(0, 10), pady = c(3, 4))
-  
-
-tkgrid(tklabel(tab2box1_1, text = "More Bin labels"), pady = c(4, 3), row = 7, column = 3,
-       columnspan = 3)
-
-tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_five),  
        padx = c(10, 0), pady = c(5, 0), column = 3, row = 8)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 0), column = 4,
        row = 8, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 3, textvariable = Pos_five), column = 5, row = 8, 
-       sticky = "w", padx = c(0, 10), pady = c(5, 0))
+tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_three), column = 5, row = 8,
+       sticky = "w", padx = c(0, 10), pady = c(3, 0))
 
-tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_six), 
+tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_four),  
        padx = c(10, 0), pady = c(5, 0), column = 3, row = 9)
-tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 0), column = 4, 
-       row = 9, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 3, textvariable = Pos_six), column = 5, row = 9, 
-       sticky = "w", padx = c(0, 10), pady = c(5, 0))
+tkgrid(tklabel(tab2box1_1, text = 'Pos'), column = 4, row = 9, sticky = "w",
+       padx = c(5, 3), pady = c(5, 0))
+tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_four), column = 5, row = 9,
+       sticky = "w", padx = c(0, 10), pady = c(3, 0))
+  
 
-tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_seven), 
-       padx = c(10, 0), pady = c(5, 0), column = 3, row = 10)
-tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 0), column = 4,
-       row = 10, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 3, textvariable = Pos_seven), column = 5, row = 10, 
-       sticky = "w", padx = c(0, 10), pady = c(5, 0))
+tkgrid(tklabel(tab2box1_1, text = "More Bin labels"), pady = c(4, 3), row = 11, column = 0,
+       columnspan = 6)
 
-tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_eight), 
-       padx = c(10, 0), pady = c(5, 5), column = 3, row = 11)
-tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 5), column = 4,
-       row = 11, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 3, textvariable = Pos_eight), column = 5, row = 11, 
-       sticky = "w", padx = c(0, 10), pady = c(5, 5))
+tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 0), column = 0,
+       row = 12, sticky = "w")
+tkgrid(tk2entry(tab2box1_1, width = 35, textvariable = Pos_five), column = 1, row = 12, 
+       padx = c(0, 10), columnspan = 5, sticky = "w")
+tkgrid(tklabel(tab2box1_1, text = 'lable'), padx = c(5, 0), column = 0,
+       row = 13, sticky = "w")
+tkgrid(tk2entry(tab2box1_1, width = 35, textvariable = Txt_five), column = 1, row = 13, 
+       padx = c(0, 10), columnspan = 5)
+
+
  
 tkgrid(tab2box1_1)
 
