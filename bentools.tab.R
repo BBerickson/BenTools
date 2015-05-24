@@ -69,6 +69,41 @@ destring <- function(x,keep="0-9.-") {
   return(as.numeric(gsub(paste("[^",keep,"]+",sep=""),"",x)))
 }
 
+#moves all items from one list to the other
+switchLstAll<-function(onlist, offlist, direction, workinglist){
+  if(direction == "on"){
+    tkdelete(offlist, 0, 'end')
+    tkdelete(onlist, 0, 'end')
+    tkconfigure(onlist, listvariable = tclVar(names(FILE_LIST)))
+    lapply(names(FILE_LIST), function(i) GENE_LIST_INFO[[workinglist]][[i]][6] <<- 1)
+    }
+     
+  if(direction == "off"){
+    tkdelete(offlist, 0, 'end')
+    tkdelete(onlist, 0, 'end')
+    tkconfigure(offlist, listvariable = tclVar(names(FILE_LIST)))
+    lapply(names(FILE_LIST), function(i) GENE_LIST_INFO[[workinglist]][[i]][6] <<- 0)
+  }
+}
+
+#moves selected items from one list to the other
+switchLst<-function(onlist, offlist, workinglist){
+  for(i in rev(as.integer(tkcurselection(onlist)))){
+    tkinsert(offlist,"end",tclvalue(tkget(onlist,i)))
+    GENE_LIST_INFO[[workinglist]][[tclvalue(tkget(onlist,i))]][6] <<- 0
+    print(GENE_LIST_INFO[[workinglist]][[tclvalue(tkget(onlist,i))]][6])
+    tkdelete(onlist,i)
+  }
+  for(i in rev(as.integer(tkcurselection(offlist)))){
+    tkinsert(onlist,"end",tclvalue(tkget(offlist,i)))
+    GENE_LIST_INFO[[workinglist]][[tclvalue(tkget(offlist,i))]][6] <<- 1
+    print(GENE_LIST_INFO[[workinglist]][[tclvalue(tkget(offlist,i))]][6])
+    tkdelete(offlist,i)
+  }
+}
+
+# read in files functions ----
+
 # reads in file, tests, fills out info 
 GetTableFile <- function(...) {
   if(STATE[3] == 0){
@@ -77,7 +112,7 @@ GetTableFile <- function(...) {
     }else{
       file_count <- length(FILE_LIST)
     }
-    tk2notetab.select(nb, "Table files")
+    #tk2notetab.select(nb, "Table files") # change tab
     STATE[3] <<- 1
     if(file_count > 10){ 
       tkmessageBox(message = "I have too many files, 
@@ -143,6 +178,7 @@ GetTableFile <- function(...) {
                                               1))
       first_file[is.na(first_file)] <- 0
       FILE_LIST[ld_name] <<- list(first_file)
+      tkinsert(cgonbox, 'end', ld_name)
     }
     tcl("wm", "attributes", root, topmost=TRUE)
     STATE[3] <<- 0  
@@ -151,7 +187,7 @@ GetTableFile <- function(...) {
   }
 }
 
-# After file is loaded comboboxes are added to and set
+# After file is loaded comboboxes and are added to and set
 GetTableFileHelper <- function(...){
   if(GetTableFile()){
     tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1), state="active")
@@ -160,7 +196,7 @@ GetTableFileHelper <- function(...){
   }
 }
 
-# plotting chunck ----
+# plotting functions ----
 
 # Makes data frame and gathers plot settings for plotting active samples
 MakeDataFrame <- function(){
@@ -299,12 +335,9 @@ GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my
  print(gp)
 }
 
-# translates dot and line chr to number
-#TODO
-
 # combobox functions ----
 
-# sets comboboxs to correct values
+# updates comboboxs and lists 
 cbb_configure <- function(){
   num <- tclvalue(tkget(cbb_file))
   if(!is.null(names(FILE_LIST)) & STATE[3] == 0){
@@ -359,7 +392,7 @@ tcl("wm", "attributes", root, topmost = TRUE)
 tkwm.title(root, my_version_num)
 
 # menu setup ----
-topMenu <- tkmenu(root)           # Create a menu
+topMenu <- tk2menu(root)           # Create a menu
 tkconfigure(root, menu = topMenu) # Add it to the main window
 fileMenu <- tkmenu(topMenu, tearoff = FALSE)
 tkadd(fileMenu, "command", label = "Load table file", command = function() 
@@ -371,20 +404,20 @@ tkadd(fileMenu, "command", label = "Restart", command = function()
   tkdestroy(root))
 tkadd(topMenu, "cascade", label = "File", menu = fileMenu)
 
-# notebook ----
+# create main notebook ----
 nb <- tk2notebook(root, tabs = c("Table files", "Plot", "Gene lists", "tools"))
 tkgrid(nb)
 
 # tab loading table files ----
 filetab <- tk2notetab(nb, "Table files")
+
 # needed to add so that when switching tabs things get updated right
 tkbind(filetab, "<Visibility>", cbb_configure)
 
 # frame for file select 
 tab1box1 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
 
-main_list <- tklistbox(tab1box1, height = 1, width = 38, relief = 'flat', 
-                       background = 'gray93')
+main_list <- tklistbox(tab1box1, height = 1, width = 38, relief = 'flat')
 tkgrid(main_list, sticky = "n", row = 0)	
 tkinsert(main_list, 0, "                       List of table files")
 
@@ -409,22 +442,19 @@ tkgrid(tab1box1, row = 0, sticky = "n")
 # frame for file options and info
 tab1box2 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
  
-title_file <- tklistbox(tab1box2, height = 1, width = 38, relief = 'flat', 
-                      background = 'gray93')
+title_file <- tklistbox(tab1box2, height = 1, width = 38, relief = 'flat')
 tkgrid(title_file, columnspan = 2)  
 tkinsert(title_file, 0, "                     File options settings")
 
-full_name1 <- tklistbox(tab1box2, height = 1, width = 6, relief = 'flat', 
-                      background = 'gray93')
+full_name1 <- tklistbox(tab1box2, height = 1, width = 6, relief = 'flat')
 tkgrid(full_name1, padx = c(20, 0))  
 tkinsert(full_name1, 0, "File:")
-full_name2 <- tklistbox(tab1box2, height = 1, width = 35, relief = 'flat', 
-                         background = 'gray93')
+full_name2 <- tklistbox(tab1box2, height = 1, width = 35, relief = 'flat')
 tkgrid(full_name2, column = 1, row = 1, sticky = "w", padx = c(0, 4)) 
 tkinsert(full_name2, 0, paste(GENE_LIST_INFO$main[1]))
  
 tkgrid(tklistbox(tab1box2, listvariable = tclVar("nickname:"), height = 1, width = 10, 
-                 relief = 'flat', background = 'gray93'), padx = c(20, 0))
+                 relief = 'flat'), padx = c(20, 0))
 
 new_name <- tk2entry(tab1box2, width = 35)
 tkgrid(new_name, sticky = "w", column = 1, row = 2, padx = c(0, 4))
@@ -432,7 +462,7 @@ tkinsert(new_name, 0,  paste(GENE_LIST_INFO$main[1]))
 tkbind(new_name, "<Leave>", cbb_setvalues)
 
 tkgrid(tklistbox(tab1box2, listvariable = tclVar("Line"), height = 1, width = 4, 
-                 relief = 'flat', background = 'gray93'), padx = c(20, 0))
+                 relief = 'flat'), padx = c(20, 0))
 
 cbb_line <- tk2combobox(tab1box2, value = my_linelist, textvariable= start_line_list,
                         state="readonly")
@@ -440,7 +470,7 @@ tkgrid(cbb_line, sticky = "w", column = 1, row = 3, padx = c(0, 16))
 tkbind(cbb_line, "<<ComboboxSelected>>", cbb_setvalues)
 
 tkgrid(tklistbox(tab1box2, listvariable = tclVar("dot"), height = 1, width = 4, 
-                 relief = 'flat', background = 'gray93'), padx = c(20, 0))
+                 relief = 'flat'), padx = c(20, 0))
 
 cbb_dot <- tk2combobox(tab1box2, value = my_dotlist, textvariable= start_dot_list,
                        state="readonly") 
@@ -448,7 +478,7 @@ tkgrid(cbb_dot, sticky = "w", column = 1, row = 4, padx = c(0, 16))
 tkbind(cbb_dot, "<<ComboboxSelected>>", cbb_setvalues)
 
 tkgrid(tklistbox(tab1box2, listvariable = tclVar("color"), height = 1, width = 5, 
-                 relief = 'flat', background = 'gray93'), padx = c(20, 0))
+                 relief = 'flat'), padx = c(20, 0))
 
 cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(color_sets))]], 
                          textvariable= start_color, state="readonly")
@@ -464,10 +494,6 @@ tkgrid(tkbutton(tab1box3, font =c('bold', 23), text = '      Plot       ',
 tkgrid(tab1box3, column = 0, row = 1)
 
 # tab plot ----
-
-
-# legends, ylim, ...
-
 plottab <- tk2notetab(nb, "Plot")
 
 # box for plot settings
@@ -491,11 +517,10 @@ cb_log2 <- tkcheckbutton(tab2box1, variable = cbVar_log2, text = "log2 transform
 tkgrid(cb_log2)
 
 tkgrid(tklistbox(tab2box1, listvariable = tclVar("Norm_to_bin"), height = 1, width = 12, 
-                 relief = 'flat', background = 'gray93'), padx = c(50, 0), sticky = "w")
+                 relief = 'flat'), padx = c(50, 0), sticky = "w")
 
 cbb_nbin <- tk2combobox(tab2box1, textvariable = cbbVar_nbin, state="readonly", width = 3)
 tkgrid(cbb_nbin, sticky = "e", column = 0, row = 5, padx = c(0, 50)) 
-#tkbind(cbb_nb, "<<ComboboxSelected>>", )
 
 tkgrid(tab2box1, row = 0, sticky = "n")
 
@@ -555,13 +580,10 @@ tkgrid(tklabel(tab2box1_1, text = 'lable'), padx = c(5, 0), column = 0,
        row = 13, sticky = "w")
 tkgrid(tk2entry(tab2box1_1, width = 35, textvariable = Txt_five), column = 1, row = 13, 
        padx = c(0, 10), columnspan = 5)
-
-
  
 tkgrid(tab2box1_1)
 
-# plot checkboxs for each file and master checkbox, tabs for each list 
-
+# on/off list notebook ---- 
 tab2box2 <- tkframe(plottab, relief = 'ridge', borderwidth = 5)
 pnb <- tk2notebook(tab2box2, tabs =c("Common Genes","Gene list 1","Gene list 2", 
                                      "Gene list 3", " Gene list 4"))
@@ -571,8 +593,12 @@ cgtabbox2 <- tkframe(pttab)
 tkgrid(tklabel(cgtabbox2, text= "List of table files"), columnspan = 6)
 cgonbox <- tk2listbox(cgtabbox2, width = 40, height = 13)
 tkgrid(cgonbox, columnspan = 3)
-tkgrid(tkbutton(cgtabbox2,text="<<Switch>>"), 
-       tkbutton(cgtabbox2,text="<<All On>>"), tkbutton(cgtabbox2,text="<<All Off>>"),
+tkgrid(tkbutton(cgtabbox2,text="<<Switch>>", command = function() 
+  switchLst(cgonbox, cgoffbox, "main")), 
+       tkbutton(cgtabbox2,text="<<All On>>", command = function() 
+         switchLstAll(cgonbox, cgoffbox, "on", "main")), 
+       tkbutton(cgtabbox2,text="<<All Off>>", command = function() 
+         switchLstAll(cgonbox, cgoffbox, "off", "main")),
        sticky = 'we')
 cgoffbox <- tk2listbox(cgtabbox2, width = 40, height = 13)
 tkgrid(cgoffbox, columnspan = 3)
@@ -598,5 +624,5 @@ tkgrid(tab2box2, column = 1, row = 0, rowspan = 2)
 
  # end ----
 #}
-
+try(tk2theme("keramik"), silent = TRUE)
 #expandTk()
