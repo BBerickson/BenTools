@@ -31,6 +31,7 @@ my_linelist <- c("solid line", "dashed line", "dotted line", "dot dash line",
 MY_COLORS <- list("colorset1" = c("blue", "green", "red", "orange", "purple", "yellow", rep("black",10)),
                   "colorset2" = c("red", "orange", "purple", "yellow", "blue", "green", rep("black",10)))
 my_math <- c(" mean", " sum", " median")
+MY_LISTBOXS <- c("cgonbox", "cgoffbox")
 plot_lines <- c("543 bins 20,20,40", "5 1.5k-2k 70 bins", "543 bins 10,10,10", "543 bins 20,20,20", "5 .5k-1.5k")
 
 # tcl starting values ----
@@ -91,18 +92,29 @@ switchLst<-function(onlist, offlist, workinglist){
   for(i in rev(as.integer(tkcurselection(onlist)))){
     tkinsert(offlist,"end",tclvalue(tkget(onlist,i)))
     GENE_LIST_INFO[[workinglist]][[tclvalue(tkget(onlist,i))]][6] <<- 0
-    print(GENE_LIST_INFO[[workinglist]][[tclvalue(tkget(onlist,i))]][6])
     tkdelete(onlist,i)
   }
   for(i in rev(as.integer(tkcurselection(offlist)))){
     tkinsert(onlist,"end",tclvalue(tkget(offlist,i)))
     GENE_LIST_INFO[[workinglist]][[tclvalue(tkget(offlist,i))]][6] <<- 1
-    print(GENE_LIST_INFO[[workinglist]][[tclvalue(tkget(offlist,i))]][6])
     tkdelete(offlist,i)
   }
 }
 
-# read in files functions ----
+# updates items in lists when a file is removed
+UpdateLstAll<-function(onlist, offlist){
+  for(i in names(GENE_LIST_INFO)){
+    for(j in GENE_LIST_INFO[[i]]){
+      if(GENE_LIST_INFO[[i]][[j]][6] == 1){
+        tkinsert(onlist, 'end', j)
+    }else{
+      tkinsert(offlist, 'end', j)
+    }
+    }
+  }
+}
+  
+# read in /remove files functions ----
 
 # reads in file, tests, fills out info 
 GetTableFile <- function(...) {
@@ -194,6 +206,28 @@ GetTableFileHelper <- function(...){
     tkconfigure(cbb_file, textvariable=tclVar(last(sapply(GENE_LIST_INFO$main, "[[", 1))))
     cbb_configure()
   }
+}
+
+#removes file
+RemoveFile <- function(...){
+  if(!is.null(names(FILE_LIST)) & STATE[3] == 0 & length(names(FILE_LIST)) > 1){
+    num <- tclvalue(tkget(full_name2, 0))
+    FILE_LIST[[num]] <- NULL
+    FILE_LIST_INFO[[num]] <- NULL
+    gene_names <- NULL
+    lapply(names(FILE_LIST), function(i) gene_names <<- c(gene_names, unique(FILE_LIST[[i]][,1])))
+    gene_names <- gene_names[duplicated(gene_names)]
+    GENE_LISTS$main$common <- gene_names
+    # update GENE_LISTS[[]]$common all but $main ... look at rapply
+    sapply(names(GENE_LIST_INFO), function(i) GENE_LIST_INFO[[i]][[num]] <<-NULL)
+    UpdateLstAll(cgonbox, cgoffbox)
+    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1), state="active")
+    tkconfigure(cbb_file, textvariable=tclVar(names(FILE_LIST)[1]))
+    tkdelete(full_name2, 0, "end")
+    tkinsert(full_name2, 0, names(FILE_LIST)[1])
+    cbb_configure()
+  }
+  # if last one ask for reset
 }
 
 # plotting functions ----
@@ -303,25 +337,26 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
 
   my_xlab <- my_xlab[!is.na(my_xbreaks)]
   my_xbreaks <- my_xbreaks[!is.na(my_xbreaks)]
+  names(use_col) <- use_name
+  names(use_dot) <- use_name
+  names(use_line) <- use_name
   GGplotF(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my_xlab)
 }
 
 # ggplot function
 GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my_xlab){
   if(tclvalue(cbVar_log2) == 1){
-    gp <- ggplot(long_list, aes(x=bin, y=log2(value), group=set, color=set, 
-                              shape=set, linetype=set))
+
+    gp <- ggplot(long_list, aes(x=bin, y=log2(value), color=set, shape=set, linetype=set))
   }else{
-    gp <- ggplot(long_list, aes(x=bin, y=value, group=set, color=set, 
-                                shape=set, linetype=set))
+    gp <- ggplot(long_list, aes(x=bin, y=value, color=set, shape=set, linetype=set))
   }
-  # Use larger points, fill with white
   gp <- gp +
+   
     geom_line(size=1.5) + geom_point(size=4) +  
-    #ylim(0, 0.0009) +             # Set y range
-    scale_color_manual(name="Sample", values=use_col)+
-    scale_shape_manual(name="Sample", values=use_dot) + 
-    scale_linetype_manual(name="Sample", values=use_line)+
+    scale_color_manual(name = "Sample", values=use_col)+
+    scale_shape_manual(name = "Sample", values=use_dot) + 
+    scale_linetype_manual(name = "Sample", values=use_line)+
     xlab("Bins") + ylab(y_lab) + # Set axis labels
     ggtitle(tclvalue(Header)) +  # Set title
     scale_x_continuous(breaks = my_xbreaks, labels = my_xlab)+
@@ -482,7 +517,11 @@ tkgrid(tklistbox(tab1box2, listvariable = tclVar("color"), height = 1, width = 5
 
 cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(color_sets))]], 
                          textvariable= start_color, state="readonly")
-tkgrid(cbb_color, sticky = "w", column = 1, row = 5, padx = c(0, 16)) 
+tkgrid(cbb_color, sticky = "w", column = 1, row = 5, padx = c(0, 16))
+
+tkgrid(tkbutton(tab1box2, text = " Remove file ", command =  function() 
+  RemoveFile()))
+ 
 tkbind(cbb_color, "<<ComboboxSelected>>", cbb_setvalues)
 tkgrid(tab1box2, column = 1, row = 0)
 
@@ -607,9 +646,6 @@ tkgrid(cgtabbox2)
 cgtabbox1 <- tkframe(pttab)
 tkgrid(cgtabbox1)
 tkgrid(tab2box2, column = 1, row = 0, rowspan = 2)
-
-
-
 
 # tab  ----
 #plottab <- tk2notetab(nb, "Plot")
