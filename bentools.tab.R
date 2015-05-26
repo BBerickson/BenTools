@@ -103,15 +103,12 @@ switchLst<-function(onlist, offlist, workinglist){
 
 # updates items in lists when a file is removed
 UpdateLstAll<-function(onlist, offlist){
-  for(i in names(GENE_LIST_INFO)){
-    for(j in GENE_LIST_INFO[[i]]){
-      if(GENE_LIST_INFO[[i]][[j]][6] == 1){
-        tkinsert(onlist, 'end', j)
-    }else{
-      tkinsert(offlist, 'end', j)
-    }
-    }
-  }
+  keepon <- NULL
+  keepoff <- NULL
+  lapply(GENE_LIST_INFO, function(i) lapply(i, function(j) 
+    ifelse(j[6] == 1, keepon <<- c(keepon,j[1]), keepoff <<- c(keepoff,j[1]))))
+  tkconfigure(onlist, listvariable=tclVar(as.character(keepon)))
+  tkconfigure(offlist, listvariable=tclVar(as.character(keepoff)))
 }
   
 # read in /remove files functions ----
@@ -202,7 +199,8 @@ GetTableFile <- function(...) {
 # After file is loaded comboboxes and are added to and set
 GetTableFileHelper <- function(...){
   if(GetTableFile()){
-    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1), state="active")
+    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1), 
+                state="active",state="readonly")
     tkconfigure(cbb_file, textvariable=tclVar(last(sapply(GENE_LIST_INFO$main, "[[", 1))))
     cbb_configure()
   }
@@ -212,16 +210,19 @@ GetTableFileHelper <- function(...){
 RemoveFile <- function(...){
   if(!is.null(names(FILE_LIST)) & STATE[3] == 0 & length(names(FILE_LIST)) > 1){
     num <- tclvalue(tkget(full_name2, 0))
-    FILE_LIST[[num]] <- NULL
-    FILE_LIST_INFO[[num]] <- NULL
+    FILE_LIST[[num]] <<- NULL
+    FILE_LIST_INFO[[num]] <<- NULL
     gene_names <- NULL
-    lapply(names(FILE_LIST), function(i) gene_names <<- c(gene_names, unique(FILE_LIST[[i]][,1])))
-    gene_names <- gene_names[duplicated(gene_names)]
-    GENE_LISTS$main$common <- gene_names
+    lapply(names(FILE_LIST), function(i) gene_names <<- c(gene_names, 
+                                                          unique(FILE_LIST[[i]][,1])))
+    if(length(names(FILE_LIST)) > 1){
+      gene_names <- gene_names[duplicated(gene_names)]
+    }
+      GENE_LISTS$main$common <<- gene_names
     # update GENE_LISTS[[]]$common all but $main ... look at rapply
     sapply(names(GENE_LIST_INFO), function(i) GENE_LIST_INFO[[i]][[num]] <<-NULL)
     UpdateLstAll(cgonbox, cgoffbox)
-    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1), state="active")
+    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1))
     tkconfigure(cbb_file, textvariable=tclVar(names(FILE_LIST)[1]))
     tkdelete(full_name2, 0, "end")
     tkinsert(full_name2, 0, names(FILE_LIST)[1])
@@ -254,7 +255,7 @@ MakeDataFrame <- function(){
           if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){        
             wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"))
             dot <- which(my_dotlist == GENE_LIST_INFO[[i]][[k]][3])
-            if(dot == 21){
+            if(dot > 20){
               dot <- 0
             }
             line <- which(my_linelist == GENE_LIST_INFO[[i]][[k]][4])
@@ -472,6 +473,9 @@ stats_list <- tklistbox(tab1box1)
 tkgrid(stats_list)
 tkconfigure(stats_list, height = 2, width = 30)
 
+tkgrid(tkbutton(tab1box1, text = " Remove file ", command =  function() 
+  RemoveFile()))
+
 tkgrid(tab1box1, row = 0, sticky = "n")
 
 # frame for file options and info
@@ -518,10 +522,6 @@ tkgrid(tklistbox(tab1box2, listvariable = tclVar("color"), height = 1, width = 5
 cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(color_sets))]], 
                          textvariable= start_color, state="readonly")
 tkgrid(cbb_color, sticky = "w", column = 1, row = 5, padx = c(0, 16))
-
-tkgrid(tkbutton(tab1box2, text = " Remove file ", command =  function() 
-  RemoveFile()))
- 
 tkbind(cbb_color, "<<ComboboxSelected>>", cbb_setvalues)
 tkgrid(tab1box2, column = 1, row = 0)
 
