@@ -15,8 +15,8 @@ GENE_LISTS <- list() # for holding each gene list
 GENE_LIST_INFO <- list() 
 # c(name, nickname, dot", line", color, plot yes/no)
 # for each file in each common gene list 
-STATE <- c(0, 0, 0, 1) # Keep track of the state and flow control 
-# [1] active tab number, [2] check if load file window open, 
+STATE <- c("colorset1", 0, 0, 1) # Keep track of the state and flow control 
+# [1] active color set, [2] check if load file window open, 
 # [3] when busy stop user input/activity, [4] master plot check
 
 # value lists ----
@@ -56,6 +56,7 @@ Pos_four <- tclVar(40.5)
 Pos_five <- tclVar(c(1, 6, 11, 50, 55, 60, 65, 70, 75, 80))
 cbVar_relative_frequency <- tclVar(0)
 cbVar_log2 <- tclVar(0)
+cbVar_colorset <- tclVar(0)
 
 # functions ----
 
@@ -114,7 +115,7 @@ UpdateLstAll<-function(onlist, offlist){
 # read in /remove files functions ----
 
 # reads in file, tests, fills out info 
-GetTableFile <- function(...) {
+GetTableFile <- function() {
   if(STATE[3] == 0){
     if(is.null(names(FILE_LIST))){
       file_count <- 0
@@ -181,9 +182,13 @@ GetTableFile <- function(...) {
                                                           sum(is.na(first_file))), 
                                                paste(" Zeors = ", 
                                                      sum(first_file==0, na.rm = TRUE))))
+      colorsafe <- file_count %% length(MY_COLORS[[STATE[1]]])
+      if(colorsafe == 0 ){
+        colorsafe <- file_count
+      }
       GENE_LIST_INFO$main[ld_name] <<- list(c(ld_name, legend_name, my_dotlist[1], 
                                               my_linelist[1],
-                                              MY_COLORS[[tclvalue(tkget(color_sets))]][file_count], 
+                                              MY_COLORS[[STATE[1]]][colorsafe], 
                                               1))
       first_file[is.na(first_file)] <- 0
       FILE_LIST[ld_name] <<- list(first_file)
@@ -197,17 +202,17 @@ GetTableFile <- function(...) {
 }
 
 # After file is loaded comboboxes and are added to and set
-GetTableFileHelper <- function(...){
+GetTableFileHelper <- function(){
   if(GetTableFile()){
     tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1), 
                 state="active",state="readonly")
     tkconfigure(cbb_file, textvariable=tclVar(last(sapply(GENE_LIST_INFO$main, "[[", 1))))
-    cbb_configure()
+    return(cbb_configure())
   }
 }
 
 #removes file
-RemoveFile <- function(...){
+RemoveFile <- function(){
   if(!is.null(names(FILE_LIST)) & STATE[3] == 0 & length(names(FILE_LIST)) > 1){
     num <- tclvalue(tkget(full_name2, 0))
     FILE_LIST[[num]] <<- NULL
@@ -226,11 +231,40 @@ RemoveFile <- function(...){
     tkconfigure(cbb_file, textvariable=tclVar(names(FILE_LIST)[1]))
     tkdelete(full_name2, 0, "end")
     tkinsert(full_name2, 0, names(FILE_LIST)[1])
-    cbb_configure()
+    return(cbb_configure())
   }
   # if last one ask for reset
 }
 
+#get file to add more custome color options
+GetColor <- function(){
+  if(STATE[3] == 0){
+     STATE[3] <<- 1
+     tcl("wm", "attributes", root, topmost=F)
+    
+    file_name <- tclvalue(tkgetOpenFile(filetypes = 
+                                          "{{color.txt Files} {.txt}}"))
+    if(!nchar(file_name)) { ## file select test
+      STATE[3] <<- 0
+      return()
+    }else if(file_name %in% names(MY_COLORS)){
+      tkmessageBox(message = "This file has already been loaded")
+      STATE[3] <<- 0
+      tcl("wm", "attributes", root, topmost=TRUE)
+      return()
+    }else{
+      l_name <- strsplit(as.character(file_name), '/') 
+      ld_name <- paste(l_name[[1]][(length(l_name[[1]]))])
+      legend_name <- paste(strsplit(as.character(ld_name), '.txt')[[1]][1])
+      first_file <- read.table(file_name, header = FALSE, stringsAsFactors = FALSE)
+      MY_COLORS[legend_name] <<- first_file
+      tkconfigure(cbb_color_sets, values=names(MY_COLORS),textvariable=tclVar(legend_name))
+      STATE[3] <<- 0
+      tcl("wm", "attributes", root, topmost=TRUE)
+      return(cbb_colorsets())
+    }
+  }
+}
 # plotting functions ----
 
 # Makes data frame and gathers plot settings for plotting active samples
@@ -384,6 +418,7 @@ cbb_configure <- function(){
       tkdelete(full_name2, 0, "end")
       tkinsert(full_name2, 0, num)
     }
+    tkconfigure(cbb_color_sets, textvariable=tclVar(STATE[1]))
     tkconfigure(cbb_color, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 5)[num]))
     tkconfigure(cbb_line, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 4)[num]))
     tkconfigure(cbb_dot, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 3)[num]))
@@ -401,23 +436,37 @@ cbb_setvalues <- function(){
     GENE_LIST_INFO$main[[num]][4] <<- tclvalue(tkget(cbb_line))
     GENE_LIST_INFO$main[[num]][3] <<- tclvalue(tkget(cbb_dot))
     GENE_LIST_INFO$main[[num]][2] <<- tclvalue(tkget(new_name))
-    
   } 
 }
 
 # Adds ability to change color sets
 cbb_colorsets <- function(){
-  num <- as.numeric(tclvalue(tcl(cbb_file,"current")))+1
-  if(num < 1){
-    num <- 1
-  }
   if(STATE[3] == 0){
-    tkconfigure(cbb_color, 
-                textvariable=tclVar(MY_COLORS[[tclvalue(tkget(color_sets))]][num]))
-    GENE_LIST_INFO$main[[num]][5] <<- tclvalue(tkget(cbb_color))
+    num <- as.numeric(tclvalue(tcl(cbb_file,"current")))+1
+    num1 <- length(FILE_LIST)
+    num2 <- length(MY_COLORS[[tclvalue(tkget(cbb_color_sets))]])
+    if(!is.numeric(num2) | num2 < 1){
+      return()
+    }
+    STATE[1] <<- tclvalue(tkget(cbb_color_sets))
+    if(num < 1){
+      num <- 1
+    }
+    
+    if(num1 > 0 & as.character(tclvalue(cbVar_colorset)) == 1){
+      lapply(seq_along(FILE_LIST), function(i) 
+        GENE_LIST_INFO$main[[i]][5] <<- MY_COLORS[[tclvalue(tkget(cbb_color_sets))]][ifelse(i %% num2 > 0, i %% num2, i)])  
+      colorsafe <- num %% num2
+      if(colorsafe == 0 ){
+        colorsafe <- num
+      }
+      tkconfigure(cbb_color, 
+                  textvariable=tclVar(MY_COLORS[[tclvalue(tkget(cbb_color_sets))]][colorsafe]))  
+    }  
+    tkconfigure(cbb_color,
+                values = MY_COLORS[[tclvalue(tkget(cbb_color_sets))]])  
   }
 }
-
 
 # GUI function ----
 
@@ -462,11 +511,6 @@ tkgrid(cbb_file, sticky = "n")
 tkbind(cbb_file, "<<ComboboxSelected>>", cbb_configure)
 tkconfigure(cbb_file, textvariable = start_name, state = "disable")
 
-color_sets <- tk2combobox(tab1box1, value = names(MY_COLORS), textvariable = start_col_list, 
-                          state="readonly")
-tkgrid(color_sets, sticky = "s")
-tkbind(color_sets, "<<ComboboxSelected>>", cbb_colorsets)
-
 tkgrid(tkbutton(tab1box1, text = " Load Table File ", command =  function() 
   GetTableFileHelper()))
 stats_list <- tklistbox(tab1box1)
@@ -476,7 +520,23 @@ tkconfigure(stats_list, height = 2, width = 30)
 tkgrid(tkbutton(tab1box1, text = " Remove file ", command =  function() 
   RemoveFile()))
 
-tkgrid(tab1box1, row = 0, sticky = "n")
+# frame for loading and applying diffrent color groups
+
+tab1box4 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
+
+tkgrid(tklistbox(tab1box4, listvariable = tclVar("colorset"), height = 1, width = 8, 
+                 relief = 'flat'), padx = c(5, 0))
+
+cbb_color_sets <- tk2combobox(tab1box4, value = names(MY_COLORS), textvariable = start_col_list, 
+                          state="readonly")
+tkgrid(cbb_color_sets, sticky = 'w', padx = c(0,5), column = 1, row = 0)
+tkbind(cbb_color_sets, "<<ComboboxSelected>>", cbb_colorsets)
+
+tkgrid(tkcheckbutton(tab1box4, variable = cbVar_colorset, 
+                       text = "Update colors" ))
+
+tkgrid(tkbutton(tab1box4, text = ' Load custom color ', 
+                command = function() GetColor()), pady = c(15,0), columnspan =2) 
 
 # frame for file options and info
 tab1box2 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
@@ -519,18 +579,24 @@ tkbind(cbb_dot, "<<ComboboxSelected>>", cbb_setvalues)
 tkgrid(tklistbox(tab1box2, listvariable = tclVar("color"), height = 1, width = 5, 
                  relief = 'flat'), padx = c(20, 0))
 
-cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(color_sets))]], 
+cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(cbb_color_sets))]], 
                          textvariable= start_color, state="readonly")
 tkgrid(cbb_color, sticky = "w", column = 1, row = 5, padx = c(0, 16))
 tkbind(cbb_color, "<<ComboboxSelected>>", cbb_setvalues)
-tkgrid(tab1box2, column = 1, row = 0)
+
+
 
 # frame for plot button to switch to plot tab and plot
 
 tab1box3 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
 tkgrid(tkbutton(tab1box3, font =c('bold', 23), text = '      Plot       ', 
                 command = function() MakeDataFrame())) 
+
+tkgrid(tab1box1, column = 0, row = 0)
+tkgrid(tab1box2, column = 1, row = 0)
 tkgrid(tab1box3, column = 0, row = 1)
+tkgrid(tab1box4, column = 1, row = 1)
+
 
 # tab plot ----
 plottab <- tk2notetab(nb, "Plot")
