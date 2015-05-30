@@ -19,7 +19,7 @@ STATE <- c("colorset1", 0, 0, 1) # Keep track of the state and flow control
 # [1] active color set, [2] check if load file window open, 
 # [3] when busy stop user input/activity, [4] master plot check
 
-# value lists ----
+# values for comboboxs ----
 my_dotlist <- c("circle", "triangle point up", "plus", "cross", "diamond", 
                 "triangle point down", "square cross", "star", "diamond plus", 
                 "circle  plus", "triangles up and down","square  plus", "circle cross", 
@@ -28,11 +28,18 @@ my_dotlist <- c("circle", "triangle point up", "plus", "cross", "diamond",
                 "bullet (smaller circle)", "square")
 my_linelist <- c("solid line", "dashed line", "dotted line", "dot dash line", 
                  "long dash line", "two dash line", "No line")
-MY_COLORS <- list("colorset1" = c("blue", "green", "red", "orange", "purple", "yellow", rep("black",10)),
-                  "colorset2" = c("red", "orange", "purple", "yellow", "blue", "green", rep("black",10)))
+MY_COLORS <- list("colorset1" = c("#a6cee3",  "#1f78b4",  "#b2df8a",  "#33a02c",  "#fb9a99", 
+                                  "#e31a1c",  "#fdbf6f",  "#ff7f00",  "#cab2d6", "#a6cee3",  
+                                  "#1f78b4",  "#b2df8a",  "#33a02c",  "#fb9a99",  "#e31a1c",  
+                                  "#fdbf6f",  "#ff7f00",  "#cab2d6"),
+                  "colorset2" = c("red", "orange", "purple", "yellow", "blue", "green",
+                                  rep("black",10)))
 my_math <- c(" mean", " sum", " median")
 MY_LISTBOXS <- c("cgonbox", "cgoffbox")
-plot_lines <- c("543 bins 20,20,40", "5 1.5k-2k 70 bins", "543 bins 10,10,10", "543 bins 20,20,20", "5 .5k-1.5k")
+my_plot_lines <- list("543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
+                      "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5))
+my_plot_ticks <- list("543 bins 20,20,40" = list('name' = c('-1450 -950 -450 +450 +950 +1450 +1950 +2450 +2950 +3450'), 'loc' = c(1, 6, 11, 50, 55, 60, 65, 70, 75, 80)),
+                      "543 bins 10,10,10" = list('name' = c('-450', '+450'), 'loc' = c(1,30)))
 
 # tcl starting values ----
 
@@ -43,17 +50,18 @@ start_dot_list <- tclVar(my_dotlist[1])
 start_color <- tclVar(MY_COLORS[[1]][1])
 start_math <- tclVar(my_math[1])
 cbbVar_nbin <- tclVar(0)
+start_plot_lines <- tclVar("543 bins 20,20,40")
 Header <- tclVar('')
 Txt_one <- tclVar('TSS')
 Txt_two <- tclVar('PolyA')
 Txt_three <- tclVar('500')
 Txt_four <- tclVar('500')
-Txt_five <- tclVar('-1450 -950 -450 +450 +950 +1450 +1950 +2450 +2950 +3450')
+Txt_five <- tclVar(my_plot_ticks[[1]][[1]])
 Pos_one <- tclVar(15.5)
 Pos_two <- tclVar(45.5)
 Pos_three <- tclVar(20.5)
 Pos_four <- tclVar(40.5)
-Pos_five <- tclVar(c(1, 6, 11, 50, 55, 60, 65, 70, 75, 80))
+Pos_five <- tclVar(my_plot_ticks[[1]][[2]])
 cbVar_relative_frequency <- tclVar(0)
 cbVar_log2 <- tclVar(0)
 cbVar_colorset <- tclVar(0)
@@ -128,37 +136,38 @@ GetTableFile <- function() {
       tkmessageBox(message = "I have too many files, 
                    you need to reset me or remove some files")
       STATE[3] <<- 0
-      return(FALSE)
+      return()
     }
     tcl("wm", "attributes", root, topmost=F)
     pb <- tkProgressBar(title = "Loading file, please be patient!!", width = 300 )
     file_name <- tclvalue(tkgetOpenFile(filetypes = 
                                           "{{Table Files} {.table .tab .Table}}"))
+    ld_name <- paste(strsplit(as.character(file_name), 
+                              '/')[[1]][(length(strsplit(as.character(file_name), 
+                                                         '/')[[1]]))])
     if(!nchar(file_name)) { ## file select test
       close(pb)
       STATE[3] <<- 0
-      return(FALSE)
-    }else if(file_name %in% sapply(FILE_LIST_INFO, "[[", 1)){
+      return()
+    }else if(ld_name %in% names(FILE_LIST)){
       tkmessageBox(message = "This file has already been loaded")
       STATE[3] <<- 0
       close(pb)
       tcl("wm", "attributes", root, topmost=TRUE)
-      return(FALSE)
+      return()
     }else{
-      l_name <- strsplit(as.character(file_name), '/') 
-      ld_name <- paste(l_name[[1]][(length(l_name[[1]]))])
       legend_name <- paste(strsplit(as.character(ld_name), '.tab')[[1]][1])
       first_file <- read.table(file_name, header = TRUE, stringsAsFactors= FALSE, 
                                comment.char = "")
       names(first_file)[1]<-paste("gene")
       num_bins <- dim(first_file)
       if(file_count > 0){
-        if(num_bins[2] - 1 != length(FILE_LIST[[1]]) - 1){
+        if(num_bins[2] != length(FILE_LIST[[1]])){
           close(pb)
           tkmessageBox(message = "Can't load file, different number of bins")
           STATE[3] <<- 0
           tcl("wm", "attributes", root, topmost=TRUE)
-          return(FALSE)
+          return()
         }
         gene_names <- c(GENE_LISTS$main$common, unique(first_file[,1]))
         gene_names <- gene_names[duplicated(gene_names)]
@@ -170,7 +179,7 @@ GetTableFile <- function() {
                        table files all the same way.")
           STATE[3] <<- 0
           tcl("wm", "attributes", root, topmost=TRUE)
-          return(FALSE)
+          return()
         }
       }else{ # first time setting it up
         
@@ -186,28 +195,20 @@ GetTableFile <- function() {
       if(colorsafe == 0 ){
         colorsafe <- file_count
       }
+      
       GENE_LIST_INFO$main[ld_name] <<- list(c(ld_name, legend_name, my_dotlist[1], 
                                               my_linelist[1],
                                               MY_COLORS[[STATE[1]]][colorsafe], 
                                               1))
-      first_file[is.na(first_file)] <- 0
       FILE_LIST[ld_name] <<- list(first_file)
       tkinsert(cgonbox, 'end', ld_name)
     }
     tcl("wm", "attributes", root, topmost=TRUE)
     STATE[3] <<- 0  
+    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1))
+    tkset(cbb_file, last(sapply(GENE_LIST_INFO$main, "[[", 1)))
+    cbb_configure()
     close(pb)
-    return(TRUE)
-  }
-}
-
-# After file is loaded comboboxes and are added to and set
-GetTableFileHelper <- function(){
-  if(GetTableFile()){
-    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1), 
-                state="active",state="readonly")
-    tkconfigure(cbb_file, textvariable=tclVar(last(sapply(GENE_LIST_INFO$main, "[[", 1))))
-    return(cbb_configure())
   }
 }
 
@@ -228,7 +229,7 @@ RemoveFile <- function(){
     sapply(names(GENE_LIST_INFO), function(i) GENE_LIST_INFO[[i]][[num]] <<-NULL)
     UpdateLstAll(cgonbox, cgoffbox)
     tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1))
-    tkconfigure(cbb_file, textvariable=tclVar(names(FILE_LIST)[1]))
+    tkset(cbb_file, names(FILE_LIST)[1])
     tkdelete(full_name2, 0, "end")
     tkinsert(full_name2, 0, names(FILE_LIST)[1])
     return(cbb_configure())
@@ -258,7 +259,8 @@ GetColor <- function(){
       legend_name <- paste(strsplit(as.character(ld_name), '.txt')[[1]][1])
       first_file <- read.table(file_name, header = FALSE, stringsAsFactors = FALSE)
       MY_COLORS[legend_name] <<- first_file
-      tkconfigure(cbb_color_sets, values=names(MY_COLORS),textvariable=tclVar(legend_name))
+      tkconfigure(cbb_color_sets, values=names(MY_COLORS))
+      tkset(cbb_color_sets, legend_name)
       STATE[3] <<- 0
       tcl("wm", "attributes", root, topmost=TRUE)
       return(cbb_colorsets())
@@ -411,18 +413,19 @@ GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my
 cbb_configure <- function(){
   num <- tclvalue(tkget(cbb_file))
   if(!is.null(names(FILE_LIST)) & STATE[3] == 0){
-    if(num == ""){
+    if(num == ""){ # back to "" if needed
       num <- tclvalue(tkget(full_name2,0))
-      tkconfigure(cbb_file, textvariable=tclVar(num))
+      tkset(cbb_file, num)
     }else{
       tkdelete(full_name2, 0, "end")
       tkinsert(full_name2, 0, num)
     }
-    tkconfigure(cbb_color_sets, textvariable=tclVar(STATE[1]))
-    tkconfigure(cbb_color, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 5)[num]))
-    tkconfigure(cbb_line, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 4)[num]))
-    tkconfigure(cbb_dot, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 3)[num]))
-    tkconfigure(new_name, textvariable=tclVar(sapply(GENE_LIST_INFO$main, "[[", 2)[num]))
+    # 
+    tkset(cbb_color, sapply(GENE_LIST_INFO$main, "[[", 5)[num])
+    tkset(cbb_line, sapply(GENE_LIST_INFO$main, "[[", 4)[num])
+    tkset(cbb_dot, sapply(GENE_LIST_INFO$main, "[[", 3)[num])
+    tkdelete(new_name, 0, 'end')
+    tkinsert(new_name,  0, sapply(GENE_LIST_INFO$main, "[[", 2)[num])
     tkconfigure(stats_list, listvariable = 
                   tclVar(as.character(FILE_LIST_INFO[[num]][2:3])))
   } 
@@ -460,12 +463,28 @@ cbb_colorsets <- function(){
       if(colorsafe == 0 ){
         colorsafe <- num
       }
-      tkconfigure(cbb_color, 
-                  textvariable=tclVar(MY_COLORS[[tclvalue(tkget(cbb_color_sets))]][colorsafe]))  
+      tkset(cbb_color, MY_COLORS[[tclvalue(tkget(cbb_color_sets))]][colorsafe])  
     }  
     tkconfigure(cbb_color,
                 values = MY_COLORS[[tclvalue(tkget(cbb_color_sets))]])  
   }
+}
+
+# Change plot lables with lines
+PlotLines <- function(){
+  num <- tclvalue(tkget(cbb_plot_lines))
+  tkdelete(Posone, 0, 'end')
+  tkinsert(Posone, 0, my_plot_lines[[num]][1])
+  tkdelete(Postwo, 0, 'end')
+  tkinsert(Postwo, 0, my_plot_lines[[num]][2])
+  tkdelete(Posthree, 0, 'end')
+  tkinsert(Posthree, 0, my_plot_lines[[num]][3])
+  tkdelete(Posfour, 0, 'end')
+  tkinsert(Posfour, 0, my_plot_lines[[num]][4])
+  tkdelete(Posfive, 0, 'end')
+  tkinsert(Posfive, 0, my_plot_ticks[[num]][["loc"]])
+  tkdelete(Txtfive, 0, 'end')
+  tkinsert(Txtfive, 0, my_plot_ticks[[num]][["name"]])
 }
 
 # GUI function ----
@@ -481,7 +500,7 @@ topMenu <- tk2menu(root)           # Create a menu
 tkconfigure(root, menu = topMenu) # Add it to the main window
 fileMenu <- tkmenu(topMenu, tearoff = FALSE)
 tkadd(fileMenu, "command", label = "Load table file", command = function() 
-  GetTableFileHelper())
+  GetTableFile())
 tkadd(fileMenu, "command", label = "Load color pallet")
 tkadd(fileMenu, "command", label = "Quit", command = function() 
   tkdestroy(root))
@@ -496,9 +515,6 @@ tkgrid(nb)
 # tab loading table files ----
 filetab <- tk2notetab(nb, "Table files")
 
-# needed to add so that when switching tabs things get updated right
-tkbind(filetab, "<Visibility>", cbb_configure)
-
 # frame for file select 
 tab1box1 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
 
@@ -506,13 +522,13 @@ main_list <- tklistbox(tab1box1, height = 1, width = 38, relief = 'flat')
 tkgrid(main_list, sticky = "n", row = 0)	
 tkinsert(main_list, 0, "                       List of table files")
 
-cbb_file <- tk2combobox(tab1box1, state="readonly", width=35)
+cbb_file <- tk2combobox(tab1box1, textvariable = start_name, state="readonly", width=35)
 tkgrid(cbb_file, sticky = "n")
 tkbind(cbb_file, "<<ComboboxSelected>>", cbb_configure)
-tkconfigure(cbb_file, textvariable = start_name, state = "disable")
+
 
 tkgrid(tkbutton(tab1box1, text = " Load Table File ", command =  function() 
-  GetTableFileHelper()))
+  GetTableFile()))
 stats_list <- tklistbox(tab1box1)
 tkgrid(stats_list)
 tkconfigure(stats_list, height = 2, width = 30)
@@ -610,9 +626,8 @@ tkgrid(tkbutton(tab2box1, font =c('bold', 23), text = '      Plot       ',
                 command = function() MakeDataFrame())) 
 
 
-cbb_math <- tk2combobox(tab2box1, value = my_math, state="readonly")
+cbb_math <- tk2combobox(tab2box1, value = my_math, textvariable = start_math, state="readonly")
 tkgrid(cbb_math, sticky = "n")
-tkconfigure(cbb_math, textvariable = start_math)
 
 cb_rf <- tkcheckbutton(tab2box1, variable = cbVar_relative_frequency, 
                        text = "Relative Frequency" )
@@ -645,33 +660,37 @@ tkgrid(tklabel(tab2box1_1, text = "  Header"), padx = c(5,1), pady = c(0, 2), ro
 tkgrid(tklabel(tab2box1_1, text = "Plot lines and lables"), pady = c(5, 5), row = 7,
        column = 0, columnspan = 6)
 
+cbb_plot_lines <- tk2combobox(tab2box1_1, value = names(my_plot_lines), textvariable = start_plot_lines, state="readonly", width = 20)
+tkgrid(cbb_plot_lines, column = 0, columnspan = 6, row = 7) 
+tkbind(cbb_plot_lines, '<<ComboboxSelected>>', PlotLines)
+
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_one),  
        padx = c(10, 0), pady = c(5, 0), column = 0, row = 8)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 0), column = 1, 
        row = 8, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_one), column = 2, row = 8,
-       sticky = "w", padx = c(0, 10), pady = c(5, 0))
+Posone <- tk2entry(tab2box1_1, width = 4, textvariable = Pos_one)
+tkgrid(Posone, column = 2, row = 8, sticky = "w", padx = c(0, 10), pady = c(5, 0))
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_two),  
        padx = c(10, 0), pady = c(3, 0), column = 0, row = 9)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(3, 0), column = 1,
        row = 9, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_two), column = 2 , row = 9, 
-       sticky = "w", padx = c(0, 10), pady = c(3, 0))
+Postwo <- tk2entry(tab2box1_1, width = 4, textvariable = Pos_two)
+tkgrid(Postwo, column = 2 , row = 9, sticky = "w", padx = c(0, 10), pady = c(3, 0))
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_three),  
        padx = c(10, 0), pady = c(5, 0), column = 3, row = 8)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 0), column = 4,
        row = 8, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_three), column = 5, row = 8,
-       sticky = "w", padx = c(0, 10), pady = c(3, 0))
+Posthree <- tk2entry(tab2box1_1, width = 4, textvariable = Pos_three)
+tkgrid(Posthree, column = 5, row = 8, sticky = "w", padx = c(0, 10), pady = c(3, 0))
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_four),  
        padx = c(10, 0), pady = c(5, 0), column = 3, row = 9)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), column = 4, row = 9, sticky = "w",
        padx = c(5, 3), pady = c(5, 0))
-tkgrid(tk2entry(tab2box1_1, width = 4, textvariable = Pos_four), column = 5, row = 9,
-       sticky = "w", padx = c(0, 10), pady = c(3, 0))
+Posfour <- tk2entry(tab2box1_1, width = 4, textvariable = Pos_four)
+tkgrid(Posfour, column = 5, row = 9, sticky = "w", padx = c(0, 10), pady = c(3, 0))
   
 
 tkgrid(tklabel(tab2box1_1, text = "More Bin labels"), pady = c(4, 3), row = 11, column = 0,
@@ -679,12 +698,12 @@ tkgrid(tklabel(tab2box1_1, text = "More Bin labels"), pady = c(4, 3), row = 11, 
 
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 0), column = 0,
        row = 12, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 35, textvariable = Pos_five), column = 1, row = 12, 
-       padx = c(0, 10), columnspan = 5, sticky = "w")
+Posfive <- tk2entry(tab2box1_1, width = 35, textvariable = Pos_five)
+tkgrid(Posfive, column = 1, row = 12, padx = c(0, 10), columnspan = 5, sticky = "w")
 tkgrid(tklabel(tab2box1_1, text = 'lable'), padx = c(5, 0), column = 0,
        row = 13, sticky = "w")
-tkgrid(tk2entry(tab2box1_1, width = 35, textvariable = Txt_five), column = 1, row = 13, 
-       padx = c(0, 10), columnspan = 5)
+Txtfive <- tk2entry(tab2box1_1, width = 35, textvariable = Txt_five)
+tkgrid(Txtfive, column = 1, row = 13, padx = c(0, 10), columnspan = 5)
  
 tkgrid(tab2box1_1)
 
@@ -725,6 +744,12 @@ tkgrid(tab2box2, column = 1, row = 0, rowspan = 2)
 #tkgrid(tab2box2, column = 1, row = 0)
 
  # end ----
-#}
+
+
+# needed to add so that when switching tabs things get updated right
+#tkbind(filetab, "<Visibility>", cbb_configure)
+#tkbind(plottab, "<Visibility>", PlotLines)
+
 try(tk2theme("keramik"), silent = TRUE)
+#}
 #expandTk()
