@@ -50,17 +50,17 @@ start_dot_list <- tclVar(my_dotlist[1])
 start_color <- tclVar(MY_COLORS[[1]][1])
 start_math <- tclVar(my_math[1])
 cbbVar_nbin <- tclVar(0)
-start_plot_lines <- tclVar("543 bins 20,20,40")
+start_plot_lines <- tclVar(names(my_plot_lines)[1])
 Header <- tclVar('')
 Txt_one <- tclVar('TSS')
 Txt_two <- tclVar('PolyA')
 Txt_three <- tclVar('500')
 Txt_four <- tclVar('500')
 Txt_five <- tclVar(my_plot_ticks[[1]][[1]])
-Pos_one <- tclVar(15.5)
-Pos_two <- tclVar(45.5)
-Pos_three <- tclVar(20.5)
-Pos_four <- tclVar(40.5)
+Pos_one <- tclVar(my_plot_lines[[1]][1])
+Pos_two <- tclVar(my_plot_lines[[1]][2])
+Pos_three <- tclVar(my_plot_lines[[1]][3])
+Pos_four <- tclVar(my_plot_lines[[1]][4])
 Pos_five <- tclVar(my_plot_ticks[[1]][[2]])
 cbVar_relative_frequency <- tclVar(0)
 cbVar_log2 <- tclVar(0)
@@ -278,7 +278,7 @@ MakeDataFrame <- function(){
     use_dot <- NULL
     use_line <- NULL
     use_name <- NULL
-    tk2notetab.select(nb, "Plot")
+    #tk2notetab.select(nb, "Plot")
     wide_list <- list()
     for(i in names(GENE_LISTS)){
       # checks to see if at least one in list is acitve
@@ -351,6 +351,7 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
   if(tclvalue(cbVar_log2) == 1){
     y_lab <- paste("log2(",y_lab,")", sep = "")
   }
+  x_lab <- paste("bins \n n = ", length(GENE_LISTS$main$common))
   math_list <- lapply(seq_along(wide_list), function(i) 
     data.frame(bin=(seq_along(wide_list[[i]][-1])), 
                set=(as.character(use_name[i])), 
@@ -371,19 +372,25 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
   
   my_xlab <- c(tclvalue(Txt_one), tclvalue(Txt_two),tclvalue(Txt_three),tclvalue(Txt_four),
                Tfive)
-
+  ltype <- c(3,3,1,1)
+  my_col <- c("green", "red", "black", "black")
   my_xlab <- my_xlab[!is.na(my_xbreaks)]
+  ltype <- ltype[!is.na(my_xbreaks[1:4])]
+  my_col <- my_col[!is.na(my_xbreaks[1:4])]
+  xbreaks <- my_xbreaks[1:4][!is.na(my_xbreaks[1:4])]
   my_xbreaks <- my_xbreaks[!is.na(my_xbreaks)]
+  
+  # need controls?
+  my_vlines <- data.frame(xbreaks, ltype, my_col)
   names(use_col) <- use_name
   names(use_dot) <- use_name
   names(use_line) <- use_name
-  GGplotF(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my_xlab)
+  GGplotF(long_list, use_col, use_dot, use_line, y_lab, x_lab, my_xbreaks, my_vlines, my_xlab)
 }
 
 # ggplot function
-GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my_xlab){
+GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, x_lab, my_xbreaks, my_vlines, my_xlab){
   if(tclvalue(cbVar_log2) == 1){
-
     gp <- ggplot(long_list, aes(x=bin, y=log2(value), color=set, shape=set, linetype=set))
   }else{
     gp <- ggplot(long_list, aes(x=bin, y=value, color=set, shape=set, linetype=set))
@@ -394,11 +401,13 @@ GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, my_xbreaks, my
     scale_color_manual(name = "Sample", values=use_col)+
     scale_shape_manual(name = "Sample", values=use_dot) + 
     scale_linetype_manual(name = "Sample", values=use_line)+
-    xlab("Bins") + ylab(y_lab) + # Set axis labels
+    xlab(x_lab) + ylab(y_lab) + # Set axis labels
     ggtitle(tclvalue(Header)) +  # Set title
     scale_x_continuous(breaks = my_xbreaks, labels = my_xlab)+
-    geom_vline(xintercept = my_xbreaks[1:4])+
+  
+    geom_vline(data = my_vlines, aes(xintercept = xbreaks), size = 2, linetype = my_vlines$ltype, color = my_vlines$my_col) +
     theme_bw() +
+    theme(panel.grid.minor = element_blank())+
     theme(plot.title = element_text(size = 30, vjust = 2))+
     theme(axis.title.y = element_text(size =  20, vjust = 1.5))+
     theme(axis.title.x = element_text(size =  25, vjust = 0))+
