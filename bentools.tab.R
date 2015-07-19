@@ -46,7 +46,6 @@ if(require("dplyr")){
   }
 }
 
-
 #expandTk <- function() {
   
 # starting values  ----
@@ -79,6 +78,8 @@ MY_COLORS <- list("colorset1" = c("#a6cee3",  "#1f78b4",  "#b2df8a",  "#33a02c",
                   "colorset2" = c("red", "orange", "purple", "yellow", "blue", "green",
                                   rep("black",10)))
 my_math <- c(" mean", " sum", " median")
+my_topbottom <- c(" Top%", " Bottom%")
+my_topbottom_num <- c(100, 75, 50, 25, 10, 5)
 MY_LISTBOXS <- c("cgonbox", "cgoffbox")
 my_plot_lines <- list("543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
                       "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5))
@@ -90,11 +91,16 @@ my_plot_ticks <- list("543 bins 20,20,40" = list('name' = c('-1450 -950 -450 +45
 start_name <- tclVar("Load File")
 start_col_list <- tclVar(names(MY_COLORS)[1])
 start_line_list <- tclVar(my_linelist[1])
+start_topbottom <- tclVar(my_topbottom[1])
+start_topbottom_num <- tclVar(my_topbottom_num[5])
 start_dot_list <- tclVar(my_dotlist[1])
 start_color <- tclVar(MY_COLORS[[1]][1])
 start_math <- tclVar(my_math[1])
+start_nom <- "numerator"
+start_dnom <- "denominator"
 cbbVar_nbin <- tclVar(0)
 start_plot_lines <- tclVar(names(my_plot_lines)[1])
+start_list_gene <- tclVar("common gene list")
 Header <- tclVar('')
 Txt_one <- tclVar('TSS')
 Txt_two <- tclVar('PolyA')
@@ -109,6 +115,7 @@ Pos_five <- tclVar(my_plot_ticks[[1]][[2]])
 cbVar_relative_frequency <- tclVar(0)
 cbVar_log2 <- tclVar(0)
 cbVar_colorset <- tclVar(0)
+
 
 # functions ----
 
@@ -200,7 +207,8 @@ GetTableFile <- function() {
       tcl("wm", "attributes", root, topmost=TRUE)
       return()
     }else{
-      legend_name <- paste(strsplit(as.character(ld_name), '.tab')[[1]][1])
+      legend_name <- strsplit(unlist(strsplit(as.character(ld_name), '.tab')[[1]][1]),'[.]')[[1]]
+      legend_name <- legend_name[floor(mean(seq_along(legend_name)))]
       first_file <- read.table(file_name, header = TRUE, stringsAsFactors= FALSE, 
                                comment.char = "")
       names(first_file)[1]<-paste("gene")
@@ -231,10 +239,11 @@ GetTableFile <- function() {
         GENE_LISTS$main$common <<- unique(first_file[,1])
       }
       file_count <- file_count + 1
-      FILE_LIST_INFO[ld_name] <<- list(c(file_name, paste(" NA's = ", 
-                                                          sum(is.na(first_file))), 
-                                               paste(" Zeors = ", 
-                                                     sum(first_file==0, na.rm = TRUE))))
+      FILE_LIST_INFO[ld_name] <<- list(c(file_name, paste(" % NA's = ", 
+                                                          round((sum(is.na(first_file)) / (num_bins[1] * num_bins[2])) * 100, digits = 2)), 
+                                               paste(" % Zeors = ", 
+                                                     round((sum(first_file == 0) / (num_bins[1] * num_bins[2])) * 100, digits = 2))))
+      
       colorsafe <- file_count %% length(MY_COLORS[[STATE[1]]])
       if(colorsafe == 0 ){
         colorsafe <- file_count
@@ -250,6 +259,8 @@ GetTableFile <- function() {
     tcl("wm", "attributes", root, topmost=TRUE)
     STATE[3] <<- 0  
     tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1))
+    tkconfigure(cbb_nom_file, values = sapply(GENE_LIST_INFO$main, "[[", 1))
+    tkconfigure(cbb_dnom_file, values= sapply(GENE_LIST_INFO$main, "[[", 1))
     tkset(cbb_file, last(sapply(GENE_LIST_INFO$main, "[[", 1)))
     cbb_configure()
     close(pb)
@@ -302,6 +313,14 @@ GetColor <- function(){
       ld_name <- paste(l_name[[1]][(length(l_name[[1]]))])
       legend_name <- paste(strsplit(as.character(ld_name), '.txt')[[1]][1])
       first_file <- read.table(file_name, header = FALSE, stringsAsFactors = FALSE)
+      sapply(seq_along(first_file[[1]]), function(i) 
+        if(suppressWarnings(!is.na(as.numeric(substr(first_file[[1]][i],1,1))))==TRUE){ 
+          kkk <- strsplit(first_file[[1]][i],",")
+          first_file[[1]][i] <<- rgb(as.numeric(kkk[[1]])[1], 
+                        as.numeric(kkk[[1]])[2], 
+                        as.numeric(kkk[[1]])[3], 
+                        maxColorValue = 255)})
+      
       MY_COLORS[legend_name] <<- first_file
       tkconfigure(cbb_color_sets, values=names(MY_COLORS))
       tkset(cbb_color_sets, legend_name)
@@ -311,6 +330,168 @@ GetColor <- function(){
     }
   }
 }
+
+# make normalized file ... devide one by the other
+MakeNormFile <- function(){
+  nom <- as.character(tclvalue(tkget(cbb_nom_file)))
+  dnom <- as.character(tclvalue(tkget(cbb_dnom_file)))
+  if(nom != start_nom & dnom != start_dnom){ ## change to more streamed lined and split and divide on len
+    gene_names <- c(FILE_LIST[[nom]]["gene"], FILE_LIST[[dnom]]["gene"])
+    my_list <- data.frame(inner_join(FILE_LIST[[nom]], FILE_LIST[[dnom]], by = "gene"))
+    my_list[is.na(my_list)] <- 0
+    len <- (dim(my_list)[2]-1)/2
+    my_min <- min(my_list[, -1][my_list[, -1] > 0])/2
+    my_list[,-1] <- as.data.frame(lapply(my_list[,-1], function(x){replace(x, x == 0, my_min)}))
+    first_file <- data.frame(gene = my_list[,1], my_list[,2:(len+1)] / my_list[,(len+2):((len*2)+1)])
+    ld_name <- paste(nom, dnom, sep = "/")
+    legend_name <- paste(GENE_LIST_INFO$main[[nom]][2], GENE_LIST_INFO$main[[dnom]][2], sep = "/")
+    FILE_LIST[[ld_name]] <<- first_file
+    file_count <- length(FILE_LIST)
+    FILE_LIST_INFO[[ld_name]] <<- c(ld_name, paste(" 0's, NA's now = min/2"),
+                                       paste(my_min))
+  
+    colorsafe <- file_count %% length(MY_COLORS[[STATE[1]]])
+    if(colorsafe == 0 ){
+      colorsafe <- file_count
+    }
+    GENE_LIST_INFO$main[[ld_name]] <<- c(ld_name, legend_name, my_dotlist[1], 
+                                          my_linelist[1],
+                                          MY_COLORS[[STATE[1]]][colorsafe], 
+                                          1)
+  
+    tkinsert(cgonbox, 'end', ld_name)
+    tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1))
+    tkconfigure(cbb_nom_file, values=sapply(GENE_LIST_INFO$main, "[[", 1))
+    tkconfigure(cbb_dnom_file, values=sapply(GENE_LIST_INFO$main, "[[", 1))
+    tkset(cbb_file, last(sapply(GENE_LIST_INFO$main, "[[", 1)))
+    tkset(cbb_nom_file, start_nom)
+    tkset(cbb_dnom_file, start_dnom)
+    cbb_configure()
+  }  
+}
+
+# gene list functions ----
+
+# displays the selected gene lists genes
+ShowGenes <- function(){
+  if(STATE[3] == 1 | is.null(names(FILE_LIST))){
+    return()
+  }else{    
+    list_name <- as.character(tclvalue(tkget(cbb_list_gene)))
+    if(list_name != tclvalue(start_list_gene)){ # do I need to fix this?
+      return() #add something like tkconfigure(genelistentry, listvariable = tclVar(as.character(GENE_LISTS[[list_name]]$common)))
+    }else{
+      
+      tkdelete(genelistinfo, 0, 'end')
+      tkdelete(genelistentry, 0 ,'end')
+      tkconfigure(genelistentry, listvariable = tclVar(as.character(GENE_LISTS$main$common)))
+      tkinsert(genelistinfo, 0, paste('common genes,  n = ', length(GENE_LISTS$main$common)))
+    }
+  }
+}
+
+#sorts active gene list contain top % signal based on selected bins and file
+SortTop <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, genelistcount1, 
+                    genelistcount2, tablefile, startbin1, startbox1, stopbin1, stopbox1, number) {
+  if(BusyTest()){
+    CloseSubWindows(c(3,4))
+    STATE[5] <<- 1
+    pb <<- tkProgressBar(title = "be patient!!",  min = 0, max = 100, width = 300)
+    file_count <- as.integer(tksize(filelist1))
+    file_count2 <- as.integer(tksize(filelist2))
+    sel <- NULL
+    my_list2 <- NULL
+    for(d in 1 : file_count2){
+      my_list2 <- c(my_list2, tclvalue(tkget(filelist2, (d-1))))
+    }
+    for(f in 1 : file_count){
+      if(my_list2[1] %in% tclvalue(tkget(filelist1, (f-1))))
+        sel <- c(sel, f)
+    }
+    for(f in 1 : file_count){
+      if(my_list2[2] %in% tclvalue(tkget(filelist1, (f-1))))
+        sel <- c(sel, f)
+    }
+    num_bins <- length(tablefile[[1]]) - 1 
+    R_start_bin1 <- as.integer(tclvalue(startbin1))
+    R_stop_bin1 <- as.integer(tclvalue(stopbin1))
+    R_num <- as.character(tclvalue(number))
+    gene_count <- as.integer(tksize(maingenelist))
+    myList <- NULL
+    if(R_num == " top_25%"){
+      num <-  c(1, floor(gene_count * 0.25))
+    } else if (R_num == " top_50%"){
+      num <- c(1, floor(gene_count * 0.5))
+    } else if (R_num == " top_75%"){
+      num <- c(1, floor(gene_count * 0.75))
+    } else if (R_num == " top_10%"){
+      num <- c(1, floor(gene_count * 0.1))
+    } else if (R_num == " top_5%"){
+      num <- c(1, floor(gene_count * 0.05))
+    } else if (R_num == " bottom_50%"){
+      num <- c(ceiling(gene_count * 0.5), gene_count)
+    } else if (R_num == " bottom_25%"){
+      num <- c(ceiling(gene_count * 0.75), gene_count)
+    } else if (R_num == " bottom_10%"){
+      num <- c(ceiling(gene_count * 0.9), gene_count)
+    } else if (R_num == " bottom_5%"){
+      num <- c(ceiling(gene_count * 0.95), gene_count)
+    }else if (R_num == " ALL"){
+      num <- c(1, gene_count)
+    }
+    if(is.na(R_stop_bin1) | is.na(R_start_bin1)){
+      R_start_bin1 <- 0
+      R_stop_bin1 <- 0
+    }
+    if(R_start_bin1 < 1 | R_start_bin1 > R_stop_bin1){
+      R_start_bin1 <- 1
+      tkdelete(startbox1, 0, 'end')
+      tkinsert(startbox1, "end", 1)
+    } 
+    if(R_stop_bin1 < 1 | R_stop_bin1 < R_start_bin1 | R_stop_bin1 > num_bins){
+      R_stop_bin1 <- num_bins
+      tkdelete(stopbox1, 0, 'end')
+      tkinsert(stopbox1, "end", num_bins)
+    }
+    for(i in 1: gene_count){
+      myList <- c(myList, tclvalue(tkget(maingenelist,(i-1))))
+    }
+    enesg <- as.data.frame(matrix(myList)) 
+    colnames(enesg) <- "gene"
+    outlist <-NULL
+    lc <- 0
+    for(k in sel){  
+      mch <- merge(enesg, tablefile[[k]], by="gene", sort=F)
+      apply_bins <- rowSums(mch[,-1][R_start_bin1:R_stop_bin1],	na.rm = T)
+      ix <- sort(apply_bins, decreasing=T, index=T)$ix
+      lc <- lc+1
+      outlist[[lc]] <- as.character(mch[ix,1][num[1]:num[2]])
+    }
+    tkdelete(genelist1, 0, 'end')
+    tkdelete(genelist2, 0, 'end')
+    if(length(outlist[[1]]) > 0){
+      tkconfigure(genelist1, listvariable = tclVar(as.character(outlist[[1]])))
+    }
+    if(file_count2 == 2 ){
+      if(length(outlist[[2]]) > 0){
+        tkconfigure(genelist2, listvariable = tclVar(as.character(outlist[[2]])))
+      }
+    }
+    tkdelete(genelistcount1, 0, 'end')
+    tkdelete(genelistcount2, 0, 'end')
+    lstcount1 <- paste('n = ', (as.integer(tksize(genelist1))))
+    lstcount1a <- paste(R_num , ' in ',tclvalue(tkget(filelist2,0)))
+    tkinsert(genelistcount1, "end", lstcount1, lstcount1a)
+    lstcount2 <- paste('n = ', (as.integer(tksize(genelist2))))
+    lstcount2a <- paste(R_num , ' in ',tclvalue(tkget(filelist2,1)))
+    tkinsert(genelistcount2, "end", lstcount2, lstcount2a)
+    close(pb)
+    STATE[5] <<- 0
+    return()
+  }
+  return()
+}	
+
 
 # plotting functions ----
 
@@ -330,11 +511,11 @@ MakeDataFrame <- function(){
       if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){ 
         return()
       }else{
-        enesg <- data.frame(gene=GENE_LISTS[[i]][[1]], stringsAsFactors = FALSE)
+        enesg <- data.frame(gene=GENE_LISTS[[i]][[1]])
         lapply(names(FILE_LIST), function(k) 
           # uses only acive lists  
           if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){        
-            wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"), stringsAsFactors = FALSE)
+            wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"))
             dot <- which(my_dotlist == GENE_LIST_INFO[[i]][[k]][3])
             if(dot > 20){
               dot <- 0
@@ -346,7 +527,7 @@ MakeDataFrame <- function(){
             use_col <<- c(use_col, GENE_LIST_INFO[[i]][[k]][5])
             use_dot <<- c(use_dot, dot)
             use_line <<- c(use_line, line)
-            use_name <<- c(use_name, GENE_LIST_INFO[[i]][[k]][2])
+            use_name <<- c(use_name, gsub("/", " / \n", GENE_LIST_INFO[[i]][[k]][2]))
           }
         )
       } 
@@ -426,7 +607,7 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
   my_xbreaks <- my_xbreaks[!is.na(my_xbreaks)]
   
   # need controls?
-  my_vlines <- data.frame(xbreaks, ltype, my_col, stringsAsFactors = FALSE)
+  my_vlines <- data.frame(xbreaks, ltype, my_col)
   names(use_col) <- use_name
   names(use_dot) <- use_name
   names(use_line) <- use_name
@@ -474,7 +655,6 @@ cbb_configure <- function(){
       tkdelete(full_name2, 0, "end")
       tkinsert(full_name2, 0, num)
     }
-    # 
     tkset(cbb_color, sapply(GENE_LIST_INFO$main, "[[", 5)[num])
     tkset(cbb_line, sapply(GENE_LIST_INFO$main, "[[", 4)[num])
     tkset(cbb_dot, sapply(GENE_LIST_INFO$main, "[[", 3)[num])
@@ -519,8 +699,7 @@ cbb_colorsets <- function(){
       }
       tkset(cbb_color, MY_COLORS[[tclvalue(tkget(cbb_color_sets))]][colorsafe])  
     }  
-    tkconfigure(cbb_color,
-                values = MY_COLORS[[tclvalue(tkget(cbb_color_sets))]])  
+    tkconfigure(cbb_color, values = MY_COLORS[[tclvalue(tkget(cbb_color_sets))]])  
   }
 }
 
@@ -563,7 +742,7 @@ tkadd(fileMenu, "command", label = "Restart", command = function()
 tkadd(topMenu, "cascade", label = "File", menu = fileMenu)
 
 # create main notebook ----
-nb <- tk2notebook(root, tabs = c("Table files", "Plot", "Gene lists", "tools"))
+nb <- tk2notebook(root, tabs = c("Table files", "Plot", "Genes", "Tools"))
 tkgrid(nb)
 
 # tab loading table files ----
@@ -576,16 +755,15 @@ main_list <- tklistbox(tab1box1, height = 1, width = 38, relief = 'flat')
 tkgrid(main_list, sticky = "n", row = 0)	
 tkinsert(main_list, 0, "                       List of table files")
 
-cbb_file <- tk2combobox(tab1box1, textvariable = start_name, state="readonly", width=35)
+cbb_file <- tk2combobox(tab1box1, textvariable = start_name, state = "readonly", width = 35)
 tkgrid(cbb_file, sticky = "n")
 tkbind(cbb_file, "<<ComboboxSelected>>", cbb_configure)
 
 
 tkgrid(tkbutton(tab1box1, text = " Load Table File ", command =  function() 
   GetTableFile()))
-stats_list <- tklistbox(tab1box1)
+stats_list <- tklistbox(tab1box1, height = 2, width = 30)
 tkgrid(stats_list)
-tkconfigure(stats_list, height = 2, width = 30)
 
 tkgrid(tkbutton(tab1box1, text = " Remove file ", command =  function() 
   RemoveFile()))
@@ -654,6 +832,30 @@ cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(cbb_color_s
 tkgrid(cbb_color, sticky = "w", column = 1, row = 5, padx = c(0, 16))
 tkbind(cbb_color, "<<ComboboxSelected>>", cbb_setvalues)
 
+# frame for file deviding 
+tab1box5 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
+new_file_name <- tklistbox(tab1box5, height = 1, width = 38, relief = 'flat')
+tkgrid(new_file_name, sticky = "n", columnspan = 2)  
+tkinsert(new_file_name, 0, "     select samples for normalization")
+
+num_name <- tklistbox(tab1box5, height = 1, width = 6, relief = 'flat')
+tkgrid(num_name, padx = c(20, 0), pady = c(5,0), column = 0, row = 1)  
+tkinsert(num_name, 0, "divid:")
+
+cbb_nom_file <- tk2combobox(tab1box5, state = "readonly")
+tkset(cbb_nom_file, start_nom)
+tkgrid(cbb_nom_file, sticky = "w", column = 1, row = 1, padx = c(0, 16), pady = c(5,0)) 
+
+dnom_name <- tklistbox(tab1box5, height = 1, width = 6, relief = 'flat')
+tkgrid(dnom_name, padx = c(20, 0), pady = c(0,5), column = 0, row = 2)  
+tkinsert(dnom_name, 0, "by:")
+
+cbb_dnom_file <- tk2combobox(tab1box5, state = "readonly")
+tkset(cbb_dnom_file, start_dnom)
+tkgrid(cbb_dnom_file, sticky = "w", column = 1, row = 2, padx = c(0, 16), pady = c(0,5)) 
+
+tkgrid(tkbutton(tab1box5, text = '      Create       ', 
+                command = function() MakeNormFile()), columnspan = 2) 
 
 
 # frame for plot button to switch to plot tab and plot
@@ -664,7 +866,8 @@ tkgrid(tkbutton(tab1box3, font =c('bold', 23), text = '      Plot       ',
 
 tkgrid(tab1box1, column = 0, row = 0)
 tkgrid(tab1box2, column = 1, row = 0)
-tkgrid(tab1box3, column = 0, row = 1)
+tkgrid(tab1box5, column = 0, row = 1)
+tkgrid(tab1box3, column = 0, row = 2)
 tkgrid(tab1box4, column = 1, row = 1)
 
 
@@ -786,23 +989,73 @@ cgtabbox1 <- tkframe(pttab)
 tkgrid(cgtabbox1)
 tkgrid(tab2box2, column = 1, row = 0, rowspan = 2)
 
-# tab  ----
-#plottab <- tk2notetab(nb, "Plot")
+# tab for display genes ----
+geneliststab <- tk2notetab(nb, "Genes")
 
-#tab2box1 <- tkframe(plottab, relief = 'ridge', borderwidth = 5)
-#tkgrid(tab2box1, row = 0, sticky = "n")
+tab3box1 <- tkframe(geneliststab, relief = 'ridge', borderwidth = 5)
 
-# frame for file options and info
+tkgrid(tklistbox(tab3box1, listvariable = tclVar("list:"), height = 1, width = 4, 
+                 relief = 'flat'), padx = c(20, 0))
+cbb_list_gene <- tk2combobox(tab3box1, textvariable = start_list_gene,
+                       state="readonly") 
+tkgrid(cbb_list_gene, sticky = "w", column = 1, row = 0, padx = c(0, 16)) 
 
-#tab2box2 <- tkframe(plottab, relief = 'ridge', borderwidth = 5)
-#tkgrid(tab2box2, column = 1, row = 0)
+tkgrid(tkbutton(tab3box1, text = " Show Genes ", command =  function() ShowGenes()), 
+       column = 0, row = 1, columnspan =2)
 
- # end ----
+tkgrid(tklistbox(tab3box1, listvariable = tclVar(""), height = 1, width = 12, 
+                 relief = 'flat'), padx = c(20, 0), column = 0, row = 2)
+
+tkgrid(tklistbox(tab3box1, listvariable = tclVar("compare_to:"), height = 1, width = 12, 
+                 relief = 'flat'), padx = c(20, 0), column = 0, row = 3)
+cbb_list_comp <- tk2combobox(tab3box1, textvariable = start_list_gene,
+                             state="readonly") 
+tkgrid(cbb_list_comp, sticky = "w", column = 1, row = 3, padx = c(0, 16)) 
+
+tkgrid(tkbutton(tab3box1, text = " intersect list ", command =  function() onOK()), 
+       column = 0, row = 4, columnspan =2)
+
+tkgrid(tkbutton(tab3box1, text = " save list ", command =  function() onOK()), 
+       column = 0, row = 5, columnspan =2)
 
 
-# needed to add so that when switching tabs things get updated right
-#tkbind(filetab, "<Visibility>", cbb_configure)
-#tkbind(plottab, "<Visibility>", PlotLines)
+tab3box2 <- tkframe(geneliststab, relief = 'ridge', borderwidth = 5)
+
+genelistinfo <- tklistbox(tab3box2, listvariable = tclVar("load_list"), height = 1, width = 60, 
+                 relief = 'flat')
+tkgrid(genelistinfo, column = 0, row = 0)
+genelistentry <- tk2listbox(tab3box2, height = 25, width = 60)
+tkgrid(genelistentry, column = 0, row = 1)
+
+tkgrid(tab3box1, column = 0, row = 0, sticky = "n")
+tkgrid(tab3box2, column = 1, row = 0, sticky = "n")
+
+# tab for tools ----
+tooltab <- tk2notetab(nb, "Tools")
+
+# box for plot settings
+tooltabbox1 <- tkframe(tooltab, relief = 'ridge', borderwidth = 5)
+
+tkgrid(tklabel(tooltabbox1, text = "Sort tools", width = 12)) 
+
+tkgrid(tklistbox(tooltabbox1, listvariable = tclVar(""), height = 1, width = 1, relief = 'flat'),
+       column = 0, row = 1, columnspan = 2)
+cbb_topbottom <- tk2combobox(tooltabbox1, values =  my_topbottom, textvariable = start_topbottom,
+                             state = "readonly", width = 10) 
+tkgrid(cbb_topbottom, sticky = "w", column = 0, row = 2, padx = c(5, 0)) 
+
+cbb_topbottom_num <- tk2combobox(tooltabbox1, values =  my_topbottom_num, 
+                                 textvariable = start_topbottom_num, state = "readonly", width = 3) 
+tkgrid(cbb_topbottom_num, sticky = "we", column = 1, row = 2, padx = c(0, 5), pady = c(10, 10))
+
+tkgrid(tkbutton(tooltabbox1, text = "   Sort   ", command =  function() onOK()), 
+       column = 0, row = 4, columnspan = 3, pady = c(10, 10))
+
+tkgrid(tooltabbox1, column = 0, row = 0, sticky = 'n')
+
+
+
+# end ----
 
 try(tk2theme("keramik"), silent = TRUE)
 #}
