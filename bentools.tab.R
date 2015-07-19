@@ -337,12 +337,12 @@ MakeNormFile <- function(){
   dnom <- as.character(tclvalue(tkget(cbb_dnom_file)))
   if(nom != start_nom & dnom != start_dnom){ ## change to more streamed lined and split and divide on len
     gene_names <- c(FILE_LIST[[nom]]["gene"], FILE_LIST[[dnom]]["gene"])
-    my_list <- data.frame(inner_join(FILE_LIST[[nom]], FILE_LIST[[dnom]], by = "gene"))
+    my_list <- data.frame(inner_join(FILE_LIST[[nom]], FILE_LIST[[dnom]], by = "gene"), stringsAsFactors = FALSE)
     my_list[is.na(my_list)] <- 0
     len <- (dim(my_list)[2]-1)/2
     my_min <- min(my_list[, -1][my_list[, -1] > 0])/2
-    my_list[,-1] <- as.data.frame(lapply(my_list[,-1], function(x){replace(x, x == 0, my_min)}))
-    first_file <- data.frame(gene = my_list[,1], my_list[,2:(len+1)] / my_list[,(len+2):((len*2)+1)])
+    my_list[,-1] <- as.data.frame(lapply(my_list[,-1], function(x){replace(x, x == 0, my_min)}), stringsAsFactors = FALSE)
+    first_file <- data.frame(gene = my_list[,1], my_list[,2:(len+1)] / my_list[,(len+2):((len*2)+1)], stringsAsFactors = FALSE)
     ld_name <- paste(nom, dnom, sep = "/")
     legend_name <- paste(GENE_LIST_INFO$main[[nom]][2], GENE_LIST_INFO$main[[dnom]][2], sep = "/")
     FILE_LIST[[ld_name]] <<- first_file
@@ -456,7 +456,7 @@ SortTop <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, ge
     for(i in 1: gene_count){
       myList <- c(myList, tclvalue(tkget(maingenelist,(i-1))))
     }
-    enesg <- as.data.frame(matrix(myList)) 
+    enesg <- as.data.frame(matrix(myList), stringsAsFactors = FALSE) 
     colnames(enesg) <- "gene"
     outlist <-NULL
     lc <- 0
@@ -511,11 +511,11 @@ MakeDataFrame <- function(){
       if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){ 
         return()
       }else{
-        enesg <- data.frame(gene=GENE_LISTS[[i]][[1]])
+        enesg <- data.frame(gene=GENE_LISTS[[i]][[1]], stringsAsFactors = FALSE)
         lapply(names(FILE_LIST), function(k) 
           # uses only acive lists  
           if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){        
-            wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"))
+            wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"), stringsAsFactors = FALSE)
             dot <- which(my_dotlist == GENE_LIST_INFO[[i]][[k]][3])
             if(dot > 20){
               dot <- 0
@@ -607,7 +607,7 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
   my_xbreaks <- my_xbreaks[!is.na(my_xbreaks)]
   
   # need controls?
-  my_vlines <- data.frame(xbreaks, ltype, my_col)
+  my_vlines <- data.frame(xbreaks, ltype, my_col, stringsAsFactors = FALSE)
   names(use_col) <- use_name
   names(use_dot) <- use_name
   names(use_line) <- use_name
