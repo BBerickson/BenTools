@@ -1,7 +1,51 @@
-require(ggplot2)
-require(tcltk)
-require(tcltk2)
-require(dplyr)
+if(require("ggplot2")){
+  print("ggplot2 is loaded correctly")
+} else {
+  print("trying to install ggplot2")
+  install.packages("ggplot2")
+  if(require(ggplot2)){
+    print("ggplot2 installed and loaded")
+  } else {
+    stop("could not install ggplot2")
+  }
+}
+
+if(require("tcltk")){
+  print("tcltk is loaded correctly")
+} else {
+  print("trying to install tcltk")
+  install.packages("tcltk")
+  if(require(tcltk)){
+    print("tcltk installed and loaded")
+  } else {
+    stop("could not install tcltk")
+  }
+}
+
+if(require("tcltk2")){
+  print("tcltk2 is loaded correctly")
+} else {
+  print("trying to install tcltk2")
+  install.packages("tcltk2")
+  if(require(tcltk2)){
+    print("tcltk2 installed and loaded")
+  } else {
+    stop("could not install tcltk2")
+  }
+}
+
+if(require("dplyr")){
+  print("dplyr is loaded correctly")
+} else {
+  print("trying to install dplyr")
+  install.packages("dplyr")
+  if(require(dplyr)){
+    print("dplyr installed and loaded")
+  } else {
+    stop("could not install dplyr")
+  }
+}
+
 
 #expandTk <- function() {
   
@@ -267,6 +311,7 @@ GetColor <- function(){
     }
   }
 }
+
 # plotting functions ----
 
 # Makes data frame and gathers plot settings for plotting active samples
@@ -285,11 +330,11 @@ MakeDataFrame <- function(){
       if(sum(as.numeric(sapply(GENE_LIST_INFO[[i]], "[[", 6))) == 0){ 
         return()
       }else{
-        enesg <- data.frame(gene=GENE_LISTS[[i]][[1]])
+        enesg <- data.frame(gene=GENE_LISTS[[i]][[1]], stringsAsFactors = FALSE)
         lapply(names(FILE_LIST), function(k) 
           # uses only acive lists  
           if(as.numeric(GENE_LIST_INFO[[i]][[k]][6]) == 1){        
-            wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"))
+            wide_list[[k]] <<- data.frame(inner_join(enesg, FILE_LIST[[k]], by = "gene"), stringsAsFactors = FALSE)
             dot <- which(my_dotlist == GENE_LIST_INFO[[i]][[k]][3])
             if(dot > 20){
               dot <- 0
@@ -381,7 +426,7 @@ ApplyMath <- function(wide_list, use_col, use_dot, use_line, use_name){
   my_xbreaks <- my_xbreaks[!is.na(my_xbreaks)]
   
   # need controls?
-  my_vlines <- data.frame(xbreaks, ltype, my_col)
+  my_vlines <- data.frame(xbreaks, ltype, my_col, stringsAsFactors = FALSE)
   names(use_col) <- use_name
   names(use_dot) <- use_name
   names(use_line) <- use_name
