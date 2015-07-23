@@ -1,3 +1,4 @@
+# load packages ----
 if(require("ggplot2")){
   print("ggplot2 is loaded correctly")
 } else {
@@ -48,6 +49,7 @@ if(require("dplyr")){
 
 #expandTk <- function() {
   
+
 # starting values  ----
 my_version_num <- 'Ben Tools tabs'
 FILE_LIST <- list() # for holding table files in list
@@ -87,7 +89,6 @@ my_plot_ticks <- list("543 bins 20,20,40" = list('name' = c('-1450 -950 -450 +45
                       "543 bins 10,10,10" = list('name' = c('-450', '+450'), 'loc' = c(1,30)))
 
 # tcl starting values ----
-
 start_name <- tclVar("Load File")
 start_col_list <- tclVar(names(MY_COLORS)[1])
 start_line_list <- tclVar(my_linelist[1])
@@ -116,7 +117,6 @@ cbVar_relative_frequency <- tclVar(0)
 cbVar_log2 <- tclVar(0)
 cbVar_colorset <- tclVar(0)
 
-
 # functions ----
 
 # test function 
@@ -124,7 +124,7 @@ onOK <- function(){
   print("this works")
 }
 
-# keep numbers, empty string for the rest
+# keeps numbers, empty string for the rest
 # from https://github.com/gsk3/taRifx/blob/master/R/Rfunctions.R#L1161
 destring <- function(x,keep="0-9.-") {
   return(as.numeric(gsub(paste("[^",keep,"]+",sep=""),"",x)))
@@ -270,7 +270,8 @@ GetTableFile <- function() {
 #removes file
 RemoveFile <- function(){
   if(!is.null(names(FILE_LIST)) & STATE[3] == 0 & length(names(FILE_LIST)) > 1){
-    num <- tclvalue(tkget(full_name2, 0))
+    #TODO change to cbb
+    #num <- tclvalue(tkget(full_name2, 0))
     FILE_LIST[[num]] <<- NULL
     FILE_LIST_INFO[[num]] <<- NULL
     gene_names <- NULL
@@ -285,8 +286,6 @@ RemoveFile <- function(){
     UpdateLstAll(cgonbox, cgoffbox)
     tkconfigure(cbb_file, values=sapply(GENE_LIST_INFO$main, "[[", 1))
     tkset(cbb_file, names(FILE_LIST)[1])
-    tkdelete(full_name2, 0, "end")
-    tkinsert(full_name2, 0, names(FILE_LIST)[1])
     return(cbb_configure())
   }
   # if last one ask for reset
@@ -648,13 +647,14 @@ GGplotF <- function(long_list, use_col, use_dot, use_line, y_lab, x_lab, my_xbre
 cbb_configure <- function(){
   num <- tclvalue(tkget(cbb_file))
   if(!is.null(names(FILE_LIST)) & STATE[3] == 0){
-    if(num == ""){ # back to "" if needed
-      num <- tclvalue(tkget(full_name2,0))
-      tkset(cbb_file, num)
-    }else{
-      tkdelete(full_name2, 0, "end")
-      tkinsert(full_name2, 0, num)
-    }
+    #_TODO fix or remove?
+#     if(num == ""){ # back to "" if needed
+#       num <- tclvalue(tkget(full_name2,0))
+#       tkset(cbb_file, num)
+#     }else{
+#       tkdelete(full_name2, 0, "end")
+#       tkinsert(full_name2, 0, num)
+#     }
     tkset(cbb_color, sapply(GENE_LIST_INFO$main, "[[", 5)[num])
     tkset(cbb_line, sapply(GENE_LIST_INFO$main, "[[", 4)[num])
     tkset(cbb_dot, sapply(GENE_LIST_INFO$main, "[[", 3)[num])
@@ -742,134 +742,115 @@ tkadd(fileMenu, "command", label = "Restart", command = function()
 tkadd(topMenu, "cascade", label = "File", menu = fileMenu)
 
 # create main notebook ----
-nb <- tk2notebook(root, tabs = c("Table files", "Plot", "Genes", "Tools"))
-tkgrid(nb)
+nb <- tk2notebook(root, tabs = c("Plot", "Genes", "Tools", "Plot Options"))
+tkgrid(nb, column = 1, row = 0)
 
-# tab loading table files ----
-filetab <- tk2notetab(nb, "Table files")
-
-# frame for file select 
-tab1box1 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
-
-main_list <- tklistbox(tab1box1, height = 1, width = 38, relief = 'flat')
-tkgrid(main_list, sticky = "n", row = 0)	
-tkinsert(main_list, 0, "                       List of table files")
-
-cbb_file <- tk2combobox(tab1box1, textvariable = start_name, state = "readonly", width = 35)
-tkgrid(cbb_file, sticky = "n")
-tkbind(cbb_file, "<<ComboboxSelected>>", cbb_configure)
-
-
-tkgrid(tkbutton(tab1box1, text = " Load Table File ", command =  function() 
-  GetTableFile()))
-stats_list <- tklistbox(tab1box1, height = 2, width = 30)
-tkgrid(stats_list)
-
-tkgrid(tkbutton(tab1box1, text = " Remove file ", command =  function() 
-  RemoveFile()))
+# tab for Plot Options  ----
+PlotOptionstab <- tk2notetab(nb, "Plot Options")
 
 # frame for loading and applying diffrent color groups
 
-tab1box4 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
+tab1box4 <- tkframe(PlotOptionstab, relief = 'ridge', borderwidth = 5)
 
 tkgrid(tklistbox(tab1box4, listvariable = tclVar("colorset"), height = 1, width = 8, 
                  relief = 'flat'), padx = c(5, 0))
 
 cbb_color_sets <- tk2combobox(tab1box4, value = names(MY_COLORS), textvariable = start_col_list, 
-                          state="readonly")
+                              state="readonly")
 tkgrid(cbb_color_sets, sticky = 'w', padx = c(0,5), column = 1, row = 0)
 tkbind(cbb_color_sets, "<<ComboboxSelected>>", cbb_colorsets)
 
 tkgrid(tkcheckbutton(tab1box4, variable = cbVar_colorset, 
-                       text = "Update colors" ))
+                     text = "Update colors" ))
 
 tkgrid(tkbutton(tab1box4, text = ' Load custom color ', 
                 command = function() GetColor()), pady = c(15,0), columnspan =2) 
 
-# frame for file options and info
-tab1box2 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
- 
-title_file <- tklistbox(tab1box2, height = 1, width = 38, relief = 'flat')
-tkgrid(title_file, columnspan = 2)  
-tkinsert(title_file, 0, "                     File options settings")
-
-full_name1 <- tklistbox(tab1box2, height = 1, width = 6, relief = 'flat')
-tkgrid(full_name1, padx = c(20, 0))  
-tkinsert(full_name1, 0, "File:")
-full_name2 <- tklistbox(tab1box2, height = 1, width = 35, relief = 'flat')
-tkgrid(full_name2, column = 1, row = 1, sticky = "w", padx = c(0, 4)) 
-tkinsert(full_name2, 0, paste(GENE_LIST_INFO$main[1]))
- 
-tkgrid(tklistbox(tab1box2, listvariable = tclVar("nickname:"), height = 1, width = 10, 
+tkgrid(tklistbox(tab1box4, listvariable = tclVar("Line"), height = 1, width = 4, 
                  relief = 'flat'), padx = c(20, 0))
 
-new_name <- tk2entry(tab1box2, width = 35)
-tkgrid(new_name, sticky = "w", column = 1, row = 2, padx = c(0, 4))
-tkinsert(new_name, 0,  paste(GENE_LIST_INFO$main[1]))
-tkbind(new_name, "<Leave>", cbb_setvalues)
-
-tkgrid(tklistbox(tab1box2, listvariable = tclVar("Line"), height = 1, width = 4, 
-                 relief = 'flat'), padx = c(20, 0))
-
-cbb_line <- tk2combobox(tab1box2, value = my_linelist, textvariable= start_line_list,
+cbb_line <- tk2combobox(tab1box4, value = my_linelist, textvariable= start_line_list,
                         state="readonly")
 tkgrid(cbb_line, sticky = "w", column = 1, row = 3, padx = c(0, 16)) 
 tkbind(cbb_line, "<<ComboboxSelected>>", cbb_setvalues)
 
-tkgrid(tklistbox(tab1box2, listvariable = tclVar("dot"), height = 1, width = 4, 
+tkgrid(tklistbox(tab1box4, listvariable = tclVar("dot"), height = 1, width = 4, 
                  relief = 'flat'), padx = c(20, 0))
 
-cbb_dot <- tk2combobox(tab1box2, value = my_dotlist, textvariable= start_dot_list,
+cbb_dot <- tk2combobox(tab1box4, value = my_dotlist, textvariable= start_dot_list,
                        state="readonly") 
 tkgrid(cbb_dot, sticky = "w", column = 1, row = 4, padx = c(0, 16)) 
 tkbind(cbb_dot, "<<ComboboxSelected>>", cbb_setvalues)
 
-tkgrid(tklistbox(tab1box2, listvariable = tclVar("color"), height = 1, width = 5, 
-                 relief = 'flat'), padx = c(20, 0))
+tkgrid(tk2entry(tab1box4, width = 20, textvariable = Header),  
+       padx = c(5, 0), pady = c(0, 2), sticky = "w", columnspan = 5)
+tkgrid(tklabel(tab1box4, text = "  Header"), padx = c(5,1), pady = c(0, 2))
+tkgrid(tk2entry(tab1box4, width = 20, textvariable = Header),  
+       padx = c(5, 0), pady = c(0, 2), sticky = "w", columnspan = 5)
+tkgrid(tklabel(tab1box4, text = "  Header"), padx = c(5,1), pady = c(0, 2))
+tkgrid(tk2entry(tab1box4, width = 20, textvariable = Header),  
+       padx = c(5, 0), pady = c(0, 2), sticky = "w", columnspan = 5)
+tkgrid(tklabel(tab1box4, text = "  Header"), padx = c(5,1), pady = c(0, 2))
 
-cbb_color <- tk2combobox(tab1box2, value = MY_COLORS[[tclvalue(tkget(cbb_color_sets))]], 
+# left frame for constent items ----
+
+leftframe <- tkframe(root)
+
+# frame for file select 
+tab1box1 <- tkframe(leftframe, relief = 'ridge', borderwidth = 5)
+tkgrid(tkbutton(tab1box1, font =c('bold', 20), text = " Load Table File ", 
+                command =  function() GetTableFile()))
+
+# frame for file options and info
+leftbox1 <- tkframe(leftframe, relief = 'ridge', borderwidth = 5)
+
+title_file <- tklistbox(leftbox1, height = 1, width = 30, relief = 'flat')
+tkgrid(title_file, columnspan = 2)  
+tkinsert(title_file, 0, "                     File options settings")
+
+tkgrid(tklistbox(leftbox1, listvariable = tclVar("File"), height = 1, width = 5, 
+                 relief = 'flat'), padx = c(5, 0))
+cbb_file <- tk2combobox(leftbox1, textvariable = start_name, state = "readonly", width = 25)
+tkgrid(cbb_file, column = 1, row = 1)
+tkbind(cbb_file, "<<ComboboxSelected>>", cbb_configure)
+
+tkgrid(tklistbox(leftbox1, listvariable = tclVar("nickname:"), height = 1, width = 10, 
+                 relief = 'flat'), padx = c(5, 0))
+
+new_name <- tk2entry(leftbox1, width = 30)
+tkgrid(new_name, sticky = "w", column = 1, row = 2, padx = c(0, 4))
+tkinsert(new_name, 0,  paste(GENE_LIST_INFO$main[1]))
+tkbind(new_name, "<Leave>", cbb_setvalues)
+
+tkgrid(tklistbox(leftbox1, listvariable = tclVar("color"), height = 1, width = 5, 
+                 relief = 'flat'), padx = c(5, 0))
+
+cbb_color <- tk2combobox(leftbox1, value = MY_COLORS[[tclvalue(tkget(cbb_color_sets))]], 
                          textvariable= start_color, state="readonly")
-tkgrid(cbb_color, sticky = "w", column = 1, row = 5, padx = c(0, 16))
+tkgrid(cbb_color, sticky = "w", column = 1, row = 3, padx = c(0, 16))
 tkbind(cbb_color, "<<ComboboxSelected>>", cbb_setvalues)
 
-# frame for file deviding 
-tab1box5 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
-new_file_name <- tklistbox(tab1box5, height = 1, width = 38, relief = 'flat')
-tkgrid(new_file_name, sticky = "n", columnspan = 2)  
-tkinsert(new_file_name, 0, "     select samples for normalization")
+tkgrid(tklistbox(leftbox1, listvariable = tclVar("Stats"), height = 1, width = 5, 
+                 relief = 'flat'), column = 0, padx = c(5, 0))
+stats_list <- tklistbox(leftbox1, height = 2, width = 30)
+tkgrid(stats_list, column = 1, row = 4)
 
-num_name <- tklistbox(tab1box5, height = 1, width = 6, relief = 'flat')
-tkgrid(num_name, padx = c(20, 0), pady = c(5,0), column = 0, row = 1)  
-tkinsert(num_name, 0, "divid:")
+tkgrid(tkbutton(leftbox1, text = " Remove file ", command =  function() 
+  RemoveFile()), columnspan = 2)
 
-cbb_nom_file <- tk2combobox(tab1box5, state = "readonly")
-tkset(cbb_nom_file, start_nom)
-tkgrid(cbb_nom_file, sticky = "w", column = 1, row = 1, padx = c(0, 16), pady = c(5,0)) 
+# frame for plot button
 
-dnom_name <- tklistbox(tab1box5, height = 1, width = 6, relief = 'flat')
-tkgrid(dnom_name, padx = c(20, 0), pady = c(0,5), column = 0, row = 2)  
-tkinsert(dnom_name, 0, "by:")
-
-cbb_dnom_file <- tk2combobox(tab1box5, state = "readonly")
-tkset(cbb_dnom_file, start_dnom)
-tkgrid(cbb_dnom_file, sticky = "w", column = 1, row = 2, padx = c(0, 16), pady = c(0,5)) 
-
-tkgrid(tkbutton(tab1box5, text = '      Create       ', 
-                command = function() MakeNormFile()), columnspan = 2) 
-
-
-# frame for plot button to switch to plot tab and plot
-
-tab1box3 <- tkframe(filetab, relief = 'ridge', borderwidth = 5)
+tab1box3 <- tkframe(leftframe, relief = 'ridge', borderwidth = 5)
 tkgrid(tkbutton(tab1box3, font =c('bold', 23), text = '      Plot       ', 
                 command = function() MakeDataFrame())) 
 
+
 tkgrid(tab1box1, column = 0, row = 0)
-tkgrid(tab1box2, column = 1, row = 0)
-tkgrid(tab1box5, column = 0, row = 1)
+#tkgrid(tab1box2, column = 1, row = 0)
 tkgrid(tab1box3, column = 0, row = 2)
 tkgrid(tab1box4, column = 1, row = 1)
-
+tkgrid(leftbox1, column = 0, row = 1)
+tkgrid(leftframe, column = 0, row = 0)
 
 # tab plot ----
 plottab <- tk2notetab(nb, "Plot")
@@ -877,11 +858,7 @@ plottab <- tk2notetab(nb, "Plot")
 # box for plot settings
 tab2box1 <- tkframe(plottab, relief = 'ridge', borderwidth = 5)
 
-tkgrid(tklabel(tab2box1, text = "Plot Options", width = 38))  
-
-tkgrid(tkbutton(tab2box1, font =c('bold', 23), text = '      Plot       ', 
-                command = function() MakeDataFrame())) 
-
+tkgrid(tklabel(tab2box1, text = "Plot Options", width = 35))  
 
 cbb_math <- tk2combobox(tab2box1, value = my_math, textvariable = start_math, state="readonly")
 tkgrid(cbb_math, sticky = "n")
@@ -909,11 +886,6 @@ tkgrid(tklabel(tab2box1_1, text = ' Plot Options ', width = 30), padx = c(5, 3),
        pady = c(0, 2), columnspan = 6)
 
 
-tkgrid(tk2entry(tab2box1_1, width = 20, textvariable = Header),  
-       padx = c(5, 0), pady = c(0, 2), column = 1, row = 2, sticky = "w", columnspan = 5)
-tkgrid(tklabel(tab2box1_1, text = "  Header"), padx = c(5,1), pady = c(0, 2), row = 2,
-       column = 0)
-
 tkgrid(tklabel(tab2box1_1, text = "Plot lines and lables"), pady = c(5, 5), row = 7,
        column = 0, columnspan = 6)
 
@@ -926,28 +898,28 @@ tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_one),
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 0), column = 1, 
        row = 8, sticky = "w")
 Posone <- tk2entry(tab2box1_1, width = 4, textvariable = Pos_one)
-tkgrid(Posone, column = 2, row = 8, sticky = "w", padx = c(0, 10), pady = c(5, 0))
+tkgrid(Posone, column = 2, row = 8, sticky = "w", padx = c(0, 0), pady = c(5, 0))
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_two),  
        padx = c(10, 0), pady = c(3, 0), column = 0, row = 9)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(3, 0), column = 1,
        row = 9, sticky = "w")
 Postwo <- tk2entry(tab2box1_1, width = 4, textvariable = Pos_two)
-tkgrid(Postwo, column = 2 , row = 9, sticky = "w", padx = c(0, 10), pady = c(3, 0))
+tkgrid(Postwo, column = 2 , row = 9, sticky = "w", padx = c(0, 0), pady = c(3, 0))
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_three),  
        padx = c(10, 0), pady = c(5, 0), column = 3, row = 8)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 3), pady = c(5, 0), column = 4,
        row = 8, sticky = "w")
 Posthree <- tk2entry(tab2box1_1, width = 4, textvariable = Pos_three)
-tkgrid(Posthree, column = 5, row = 8, sticky = "w", padx = c(0, 10), pady = c(3, 0))
+tkgrid(Posthree, column = 5, row = 8, sticky = "w", padx = c(0, 0), pady = c(3, 0))
 
 tkgrid(tk2entry(tab2box1_1, width = 5, textvariable = Txt_four),  
        padx = c(10, 0), pady = c(5, 0), column = 3, row = 9)
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), column = 4, row = 9, sticky = "w",
        padx = c(5, 3), pady = c(5, 0))
 Posfour <- tk2entry(tab2box1_1, width = 4, textvariable = Pos_four)
-tkgrid(Posfour, column = 5, row = 9, sticky = "w", padx = c(0, 10), pady = c(3, 0))
+tkgrid(Posfour, column = 5, row = 9, sticky = "w", padx = c(0, 0), pady = c(3, 0))
   
 
 tkgrid(tklabel(tab2box1_1, text = "More Bin labels"), pady = c(4, 3), row = 11, column = 0,
@@ -956,23 +928,23 @@ tkgrid(tklabel(tab2box1_1, text = "More Bin labels"), pady = c(4, 3), row = 11, 
 tkgrid(tklabel(tab2box1_1, text = 'Pos'), padx = c(5, 0), column = 0,
        row = 12, sticky = "w")
 Posfive <- tk2entry(tab2box1_1, width = 35, textvariable = Pos_five)
-tkgrid(Posfive, column = 1, row = 12, padx = c(0, 10), columnspan = 5, sticky = "w")
-tkgrid(tklabel(tab2box1_1, text = 'lable'), padx = c(5, 0), column = 0,
+tkgrid(Posfive, column = 1, row = 12, padx = c(0, 0), columnspan = 5, sticky = "w")
+tkgrid(tklabel(tab2box1_1, text = 'Lable'), padx = c(5, 0), column = 0,
        row = 13, sticky = "w")
 Txtfive <- tk2entry(tab2box1_1, width = 35, textvariable = Txt_five)
-tkgrid(Txtfive, column = 1, row = 13, padx = c(0, 10), columnspan = 5)
+tkgrid(Txtfive, column = 1, row = 13, padx = c(0, 0), columnspan = 5)
  
 tkgrid(tab2box1_1)
 
 # on/off list notebook ---- 
 tab2box2 <- tkframe(plottab, relief = 'ridge', borderwidth = 5)
-pnb <- tk2notebook(tab2box2, tabs =c("Common Genes","Gene list 1","Gene list 2", 
-                                     "Gene list 3", " Gene list 4"))
+pnb <- tk2notebook(tab2box2, tabs =c("Common\nGenes","Gene\nlist 1","Gene\nlist 2", 
+                                     "Gene\nlist 3", " Gene\nlist 4"))
 tkgrid(pnb)
-pttab <- tk2notetab(pnb, "Common Genes")
+pttab <- tk2notetab(pnb, "Common\nGenes")
 cgtabbox2 <- tkframe(pttab)
 tkgrid(tklabel(cgtabbox2, text= "List of table files"), columnspan = 6)
-cgonbox <- tk2listbox(cgtabbox2, width = 40, height = 13)
+cgonbox <- tk2listbox(cgtabbox2, width = 35, height = 8)
 tkgrid(cgonbox, columnspan = 3)
 tkgrid(tkbutton(cgtabbox2,text="<<Switch>>", command = function() 
   switchLst(cgonbox, cgoffbox, "main")), 
@@ -981,7 +953,7 @@ tkgrid(tkbutton(cgtabbox2,text="<<Switch>>", command = function()
        tkbutton(cgtabbox2,text="<<All Off>>", command = function() 
          switchLstAll(cgonbox, cgoffbox, "off", "main")),
        sticky = 'we')
-cgoffbox <- tk2listbox(cgtabbox2, width = 40, height = 13)
+cgoffbox <- tk2listbox(cgtabbox2, width = 35, height = 8)
 tkgrid(cgoffbox, columnspan = 3)
 tkgrid(cgtabbox2)
 
@@ -1021,17 +993,44 @@ tkgrid(tkbutton(tab3box1, text = " save list ", command =  function() onOK()),
 
 tab3box2 <- tkframe(geneliststab, relief = 'ridge', borderwidth = 5)
 
-genelistinfo <- tklistbox(tab3box2, listvariable = tclVar("load_list"), height = 1, width = 60, 
-                 relief = 'flat')
+genelistinfo <- tklistbox(tab3box2, listvariable = tclVar("load_list"), 
+                 relief = 'flat', height = 1, width = 30)
 tkgrid(genelistinfo, column = 0, row = 0)
-genelistentry <- tk2listbox(tab3box2, height = 25, width = 60)
-tkgrid(genelistentry, column = 0, row = 1)
+genelistentry <- tk2listbox(tab3box2, height = 25, width = 30)
+tkgrid(genelistentry, column = 0, row = 1, sticky = "n")
 
 tkgrid(tab3box1, column = 0, row = 0, sticky = "n")
 tkgrid(tab3box2, column = 1, row = 0, sticky = "n")
 
 # tab for tools ----
 tooltab <- tk2notetab(nb, "Tools")
+
+# frame for file deviding 
+tab1box5 <- tkframe(tooltab, relief = 'ridge', borderwidth = 5)
+new_file_name <- tklistbox(tab1box5, height = 1, width = 38, relief = 'flat')
+tkgrid(new_file_name, sticky = "n", columnspan = 2)  
+tkinsert(new_file_name, 0, "     select samples for normalization")
+
+num_name <- tklistbox(tab1box5, height = 1, width = 6, relief = 'flat')
+tkgrid(num_name, padx = c(20, 0), pady = c(5,0), column = 0, row = 1)  
+tkinsert(num_name, 0, "divid:")
+
+cbb_nom_file <- tk2combobox(tab1box5, state = "readonly")
+tkset(cbb_nom_file, start_nom)
+tkgrid(cbb_nom_file, sticky = "w", column = 1, row = 1, padx = c(0, 16), pady = c(5,0)) 
+
+dnom_name <- tklistbox(tab1box5, height = 1, width = 6, relief = 'flat')
+tkgrid(dnom_name, padx = c(20, 0), pady = c(0,5), column = 0, row = 2)  
+tkinsert(dnom_name, 0, "by:")
+
+cbb_dnom_file <- tk2combobox(tab1box5, state = "readonly")
+tkset(cbb_dnom_file, start_dnom)
+tkgrid(cbb_dnom_file, sticky = "w", column = 1, row = 2, padx = c(0, 16), pady = c(0,5)) 
+
+tkgrid(tkbutton(tab1box5, text = '      Create       ', 
+                command = function() MakeNormFile()), columnspan = 2) 
+
+tkgrid(tab1box5, column = 0, row = 1)
 
 # box for plot settings
 tooltabbox1 <- tkframe(tooltab, relief = 'ridge', borderwidth = 5)
