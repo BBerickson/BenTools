@@ -256,6 +256,7 @@ LoadTableFile <- function() {
           return ()
         }
       } else {  # first time loading a file set up
+        tkconfigure(entry.nickname, state = "normal")
         tkconfigure(combobox.norm.bin, values=c(0:(num.bins[2] - 1)))
         list.genefile$main$common <<- unique(tablefile[ ,1])
       }
@@ -285,6 +286,8 @@ LoadTableFile <- function() {
     tkconfigure(combobox.denominator, 
                 values = sapply(list.genefile.info$main, "[[", 1))
     tkset(combobox.file, last(sapply(list.genefile.info$main, "[[", 1)))
+    tkconfigure(label.common.length, 
+                text = paste("n = ", length(list.genefile$main$common)))
     ComboboxsUpdate()
     close(pb)
   }
@@ -309,6 +312,8 @@ RemoveFile <- function() {
     UpdateEntrys(listbox.common.on, listbox.common.off)
     tkconfigure(combobox.file, values = sapply(list.genefile.info$main, "[[", 1))
     tkset(combobox.file, names(list.tablefile)[1])
+    tkconfigure(label.common.length, 
+                text = paste("n = ", length(list.genefile$main$common)))
     return (ComboboxsUpdate())
   }
   # TODO if last one ask for reset
@@ -422,11 +427,11 @@ ShowGenes <- function() {
         # list.genefile[[combo.name.gene.file]]$common)))
       return ()     
     } else {
-      tkdelete(entry.title.show.genes, 0, 'end')
+      tkdelete(listbox.title.show.genes, 0, 'end')
       tkdelete(listbox.show.genes, 0 ,'end')
       tkconfigure(listbox.show.genes, 
               listvariable = tclVar(as.character(list.genefile$main$common)))
-      tkinsert(entry.title.show.genes, 0, 
+      tkinsert(listbox.title.show.genes, 0, 
               paste('common genes,  n = ', length(list.genefile$main$common)))
     }
   }
@@ -545,6 +550,7 @@ MakeDataFrame <- function() {
   if (control.state[3] == 1 | is.null(names(list.tablefile))) {
     return ()
   } else {
+    ComboboxsUpdateVaribles()
     use.col <- NULL
     use.dot <- NULL
     use.line <- NULL
@@ -740,24 +746,25 @@ ComboboxsGeneSet <- function() {
   num3 <- unlist(strsplit(paste(num2[1], "\n", num2[2], " ", num2[3], sep = ""),
                           " NA"))
   tk2notetab.select(notebook.on.off, num3)
-  return (ComboboxsUpdate())
+  return (ComboboxsUpdateVaribles())
 }
 
 #keeps genelist cbb and tabs in sync
 ComboboxsGeneSet2 <- function() {
   tkset(combobox.gene.set, paste(strsplit(tk2notetab.text(notebook.on.off), "\n")[[1]], 
                             collapse = " "))
-  return (ComboboxsUpdate())
+  return (ComboboxsUpdateVaribles())
 }
 
 # saves current seletion
 ComboboxsUpdateVaribles <- function() {
   num <- tclvalue(tkget(combobox.file))
-  if(!is.null(names(list.tablefile)) & num != "" & control.state[3] == 0){
+  if(!is.null(names(list.tablefile)) & control.state[3] == 0){
     list.genefile.info$main[[num]][5] <<- tclvalue(tkget(combobox.color))
     list.genefile.info$main[[num]][4] <<- tclvalue(tkget(combobox.lines))
     list.genefile.info$main[[num]][3] <<- tclvalue(tkget(combobox.dots))
     list.genefile.info$main[[num]][2] <<- tclvalue(tkget(entry.nickname))
+    return (ComboboxsUpdate())
   } 
 }
 
@@ -908,8 +915,8 @@ tab.plot.options.line.tick.frame <- tkframe(notebook.main.plot.options.tab,
                                             relief = 'ridge', borderwidth = 5) 
 tkgrid(tab.plot.options.line.tick.frame)
 
-tkgrid(tklabel(tab.plot.options.line.tick.frame, text = ' Plot Options ', 
-               width = 30), padx = c(5, 3), pady = c(0, 2), columnspan = 6)
+tkgrid(tklabel(tab.plot.options.line.tick.frame, text = ' Plot Options '),
+       columnspan = 6)
 
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = "Plot lines and lables"), 
        pady = c(5, 5), row = 7, column = 0, columnspan = 6)
@@ -962,7 +969,7 @@ tkgrid(entry.line.tick.pos.four, column = 5, row = 9, sticky = "w",
        padx = c(0, 0), pady = c(3, 0))
 
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = "More Bin labels"), 
-       pady = c(4, 3), row = 11, column = 0, columnspan = 6)
+       row = 11, columnspan = 6)
 
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), padx = c(5, 0), 
        column = 0, row = 12, sticky = "w")
@@ -981,25 +988,13 @@ tkgrid(entry.line.tick.lable.five, column = 1, row = 13, padx = c(0, 0),
 
 frame.common.items <- tkframe(root)
 
-
-# frame for load file
-frame.file.load <- tkframe(frame.common.items, relief = 'ridge', 
-                             borderwidth = 5)
-tkgrid(frame.file.load, column = 0, row = 0)
-
-tkgrid(tkbutton(frame.file.load, font =c('bold', 20), 
-                text = " Load Table File ", 
-                command =  function() LoadTableFile()))
-
 # frame for gene set and file options and info
 frame.geneset.file.select <- tkframe(frame.common.items, relief = 'ridge', 
                                      borderwidth = 5)
 tkgrid(frame.geneset.file.select, column = 0, row = 1)
 
-title.geneset.file.select <- tklistbox(frame.geneset.file.select, height = 1, 
-                                       relief = 'flat')
-tkgrid(title.geneset.file.select, columnspan = 2)  
-tkinsert(title.geneset.file.select, 0, "File options settings")
+tkgrid(tklabel(frame.geneset.file.select, text = "File options settings"), 
+       columnspan = 2)
 
 tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("List"), 
                  height = 1, width = 5, relief = 'flat'), padx = c(5, 0))
@@ -1020,16 +1015,16 @@ tkbind(combobox.file, "<<ComboboxSelected>>", ComboboxsUpdate)
 tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("nickname:"),
                  height = 1, width = 10, relief = 'flat'), padx = c(5, 0))
 
-entry.nickname <- tk2entry(frame.geneset.file.select, width = 30)
+entry.nickname <- tk2entry(frame.geneset.file.select, width = 30,
+                           state = "disabled")
 tkgrid(entry.nickname, sticky = "w", column = 1, row = 3, padx = c(0, 4))
-tkinsert(entry.nickname, 0,  paste(list.genefile.info$main[1]))
 
 tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("color"), 
                  height = 1, width = 5, relief = 'flat'), padx = c(5, 0))
 
 combobox.color <- tk2combobox(frame.geneset.file.select, 
-                  value = kListColorSet[[tclvalue(tkget(combobox.color.sets))]], 
-                         textvariable= tcl.start.color, state="readonly")
+                 value = kListColorSet[[tclvalue(tkget(combobox.color.sets))]], 
+                         textvariable= tcl.start.color, state = "readonly")
 tkgrid(combobox.color, sticky = "w", column = 1, row = 4, padx = c(0, 16))
 tkbind(combobox.color, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
 
@@ -1038,9 +1033,6 @@ tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("Stats"),
                  relief = 'flat'), column = 0, padx = c(5, 0))
 listbox.stats <- tklistbox(frame.geneset.file.select, height = 2, width = 30)
 tkgrid(listbox.stats, column = 1, row = 5)
-
-tkgrid(tkbutton(frame.geneset.file.select, text = " Remove file ", 
-                command =  function() RemoveFile()), columnspan = 2)
 
 # frame for plot button
 
@@ -1100,32 +1092,157 @@ notebook.on.off.common.tab <- tk2notetab(notebook.on.off, "Common\nGenes")
 tkbind(notebook.on.off.common.tab, "<Visibility>", ComboboxsGeneSet2)
 
 frame.common.tab <- tkframe(notebook.on.off.common.tab)
-tkgrid(frame.common.tab)
 
-tkgrid(tklabel(frame.common.tab, text = "List of table files"), columnspan = 6)
-listbox.common.on <- tk2listbox(frame.common.tab, width = 35, height = 8)
+tkgrid(tklabel(frame.common.tab, text = "list of table files"), columnspan = 3)
+label.common.length <- tklabel(frame.common.tab, text = "n = ")
+tkgrid(label.common.length, columnspan = 3)
+
+listbox.common.on <- tk2listbox(frame.common.tab, width = 35, height = 5)
 tkgrid(listbox.common.on, columnspan = 3)
+tkgrid(tklabel(frame.common.tab, text ="Plot list"), columnspan = 3)
 tkgrid(tkbutton(frame.common.tab, text = "<<Switch>>", command = function() 
   MoveSelectToOtherEntry(listbox.common.on, listbox.common.off, "main")), 
     tkbutton(frame.common.tab, text = "<<All On>>", command = function() 
      MoveAllToOtherEntry(listbox.common.on, listbox.common.off, "on", "main")), 
     tkbutton(frame.common.tab, text = "<<All Off>>", command = function() 
-     MoveAllToOtherEntry(listbox.common.on, listbox.common.off, "off", "main")),
-       sticky = 'we')
-listbox.common.off <- tk2listbox(frame.common.tab, width = 35, height = 8)
+     MoveAllToOtherEntry(listbox.common.on, listbox.common.off, "off", 
+                         "main")), sticky = 'we')
+tkgrid(tklabel(frame.common.tab, text ="Don't plot list"), columnspan = 3)
+listbox.common.off <- tk2listbox(frame.common.tab, width = 35, height = 5)
 tkgrid(listbox.common.off, columnspan = 3)
+
+tkgrid(tkbutton(frame.common.tab, text = " Load table file ", 
+               command =  function() LoadTableFile()), row = 7, 
+       columnspan = 2, sticky = 'w', padx = c(3, 0))
+tkgrid(tkbutton(frame.common.tab, text = " Remove selected file ",
+               command =  function() RemoveFile()), row = 7, 
+       column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
+
+tkgrid(frame.common.tab)
 
 notebook.on.off.gene1.tab <- tk2notetab(notebook.on.off, "Gene\nlist 1")
 tkbind(notebook.on.off.gene1.tab, "<Visibility>", ComboboxsGeneSet2)
 
+frame.gene1.tab <- tkframe(notebook.on.off.gene1.tab)
+
+lable.gene1.file <- tklabel(frame.gene1.tab, text = "list of table files")
+tkgrid(lable.gene1.file, columnspan = 3)
+label.gene1.length <- tklabel(frame.gene1.tab, text = "n = ")
+tkgrid(label.gene1.length, columnspan = 3)
+
+listbox.gene1.on <- tk2listbox(frame.gene1.tab, width = 35, height = 5)
+tkgrid(listbox.gene1.on, columnspan = 3)
+tkgrid(tklabel(frame.gene1.tab, text ="Plot list"), columnspan = 3)
+tkgrid(tkbutton(frame.gene1.tab, text = "<<Switch>>", command = function() 
+  MoveSelectToOtherEntry(listbox.gene1.on, listbox.gene1.off, "main")), 
+  tkbutton(frame.gene1.tab, text = "<<All On>>", command = function() 
+    MoveAllToOtherEntry(listbox.gene1.on, listbox.gene1.off, "on", "main")), 
+  tkbutton(frame.gene1.tab, text = "<<All Off>>", command = function() 
+    MoveAllToOtherEntry(listbox.gene1.on, listbox.gene1.off, "off", 
+                        "main")), sticky = 'we')
+tkgrid(tklabel(frame.gene1.tab, text ="Don't plot list"), columnspan = 3)
+listbox.gene1.off <- tk2listbox(frame.gene1.tab, width = 35, height = 5)
+tkgrid(listbox.gene1.off, columnspan = 3)
+tkgrid(tkbutton(frame.gene1.tab, text = " Load gene list ", 
+                command =  function() LoadTableFile()), row = 7, 
+       columnspan = 2, sticky = 'w', padx = c(3, 0))
+tkgrid(tkbutton(frame.gene1.tab, text = " Remove list ",
+                command =  function() RemoveFile()), row = 7, 
+       column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
+tkgrid(frame.gene1.tab)
+
 notebook.on.off.gene2.tab <- tk2notetab(notebook.on.off, "Gene\nlist 2")
 tkbind(notebook.on.off.gene2.tab, "<Visibility>", ComboboxsGeneSet2)
+
+frame.gene2.tab <- tkframe(notebook.on.off.gene2.tab)
+
+lable.gene2.file <- tklabel(frame.gene2.tab, text = "list of table files")
+tkgrid(lable.gene2.file, columnspan = 3)
+label.gene2.length <- tklabel(frame.gene2.tab, text = "n = ")
+tkgrid(label.gene2.length, columnspan = 3)
+
+listbox.gene2.on <- tk2listbox(frame.gene2.tab, width = 35, height = 5)
+tkgrid(listbox.gene2.on, columnspan = 3)
+tkgrid(tklabel(frame.gene2.tab, text ="Plot list"), columnspan = 3)
+tkgrid(tkbutton(frame.gene2.tab, text = "<<Switch>>", command = function() 
+  MoveSelectToOtherEntry(listbox.gene2.on, listbox.gene2.off, "main")), 
+  tkbutton(frame.gene2.tab, text = "<<All On>>", command = function() 
+    MoveAllToOtherEntry(listbox.gene2.on, listbox.gene2.off, "on", "main")), 
+  tkbutton(frame.gene2.tab, text = "<<All Off>>", command = function() 
+    MoveAllToOtherEntry(listbox.gene2.on, listbox.gene2.off, "off", 
+                        "main")), sticky = 'we')
+tkgrid(tklabel(frame.gene2.tab, text ="Don't plot list"), columnspan = 3)
+listbox.gene2.off <- tk2listbox(frame.gene2.tab, width = 35, height = 5)
+tkgrid(listbox.gene2.off, columnspan = 3)
+tkgrid(tkbutton(frame.gene2.tab, text = " Load gene list ", 
+                command =  function() LoadTableFile()), row = 7, 
+       columnspan = 2, sticky = 'w', padx = c(3, 0))
+tkgrid(tkbutton(frame.gene2.tab, text = " Remove list ",
+                command =  function() RemoveFile()), row = 7, 
+       column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
+tkgrid(frame.gene2.tab)
 
 notebook.on.off.gene3.tab <- tk2notetab(notebook.on.off, "Gene\nlist 3")
 tkbind(notebook.on.off.gene3.tab, "<Visibility>", ComboboxsGeneSet2)
 
+frame.gene3.tab <- tkframe(notebook.on.off.gene3.tab)
+
+lable.gene3.file <- tklabel(frame.gene3.tab, text = "list of table files")
+tkgrid(lable.gene3.file, columnspan = 3)
+label.gene3.length <- tklabel(frame.gene3.tab, text = "n = ")
+tkgrid(label.gene3.length, columnspan = 3)
+
+listbox.gene3.on <- tk2listbox(frame.gene3.tab, width = 35, height = 5)
+tkgrid(listbox.gene3.on, columnspan = 3)
+tkgrid(tklabel(frame.gene3.tab, text ="Plot list"), columnspan = 3)
+tkgrid(tkbutton(frame.gene3.tab, text = "<<Switch>>", command = function() 
+  MoveSelectToOtherEntry(listbox.gene3.on, listbox.gene3.off, "main")), 
+  tkbutton(frame.gene3.tab, text = "<<All On>>", command = function() 
+    MoveAllToOtherEntry(listbox.gene3.on, listbox.gene3.off, "on", "main")), 
+  tkbutton(frame.gene3.tab, text = "<<All Off>>", command = function() 
+    MoveAllToOtherEntry(listbox.gene3.on, listbox.gene3.off, "off", 
+                        "main")), sticky = 'we')
+tkgrid(tklabel(frame.gene3.tab, text ="Don't plot list"), columnspan = 3)
+listbox.gene3.off <- tk2listbox(frame.gene3.tab, width = 35, height = 5)
+tkgrid(listbox.gene3.off, columnspan = 3)
+tkgrid(tkbutton(frame.gene3.tab, text = " Load gene list ", 
+                command =  function() LoadTableFile()), row = 7, 
+       columnspan = 2, sticky = 'w', padx = c(3, 0))
+tkgrid(tkbutton(frame.gene3.tab, text = " Remove list ",
+                command =  function() RemoveFile()), row = 7, 
+       column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
+tkgrid(frame.gene3.tab)
+
 notebook.on.off.gene4.tab <- tk2notetab(notebook.on.off, "Gene\nlist 4")
 tkbind(notebook.on.off.gene4.tab, "<Visibility>", ComboboxsGeneSet2)
+
+frame.gene4.tab <- tkframe(notebook.on.off.gene4.tab)
+
+lable.gene4.file <- tklabel(frame.gene4.tab, text = "list of table files")
+tkgrid(lable.gene4.file, columnspan = 3)
+label.gene4.length <- tklabel(frame.gene4.tab, text = "n = ")
+tkgrid(label.gene4.length, columnspan = 3)
+
+listbox.gene4.on <- tk2listbox(frame.gene4.tab, width = 35, height = 5)
+tkgrid(listbox.gene4.on, columnspan = 3)
+tkgrid(tklabel(frame.gene4.tab, text ="Plot list"), columnspan = 3)
+tkgrid(tkbutton(frame.gene4.tab, text = "<<Switch>>", command = function() 
+  MoveSelectToOtherEntry(listbox.gene4.on, listbox.gene4.off, "main")), 
+  tkbutton(frame.gene4.tab, text = "<<All On>>", command = function() 
+    MoveAllToOtherEntry(listbox.gene4.on, listbox.gene4.off, "on", "main")), 
+  tkbutton(frame.gene4.tab, text = "<<All Off>>", command = function() 
+    MoveAllToOtherEntry(listbox.gene4.on, listbox.gene4.off, "off", 
+                        "main")), sticky = 'we')
+tkgrid(tklabel(frame.gene4.tab, text ="Don't plot list"), columnspan = 3)
+listbox.gene4.off <- tk2listbox(frame.gene4.tab, width = 35, height = 5)
+tkgrid(listbox.gene4.off, columnspan = 3)
+tkgrid(tkbutton(frame.gene4.tab, text = " Load gene list ", 
+                command =  function() LoadTableFile()), row = 7, 
+       columnspan = 2, sticky = 'w', padx = c(3, 0))
+tkgrid(tkbutton(frame.gene4.tab, text = " Remove list ",
+                command =  function() RemoveFile()), row = 7, 
+       column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
+tkgrid(frame.gene4.tab)
 
 tkgrid(frame.on.off, column = 0, row = 1, rowspan = 2)
 
@@ -1173,10 +1290,10 @@ frame.show.genes <- tkframe(notebook.main.genes.tab, relief = 'ridge',
                             borderwidth = 5)
 tkgrid(frame.show.genes, column = 0, row = 1, sticky = "n")
 
-entry.title.show.genes <- tklistbox(frame.show.genes, 
+listbox.title.show.genes <- tklistbox(frame.show.genes, 
                                     listvariable = tclVar("load_list"), 
                  relief = 'flat', height = 1, width = 30)
-tkgrid(entry.title.show.genes, column = 0, row = 0)
+tkgrid(listbox.title.show.genes, column = 0, row = 0)
 
 listbox.show.genes <- tk2listbox(frame.show.genes, height = 20, width = 30)
 tkgrid(listbox.show.genes, column = 0, row = 1, sticky = "n")
@@ -1187,12 +1304,9 @@ notebook.main.tools.tab <- tk2notetab(notebook.main, "Tools")
 # frame for file deviding 
 frame.tools.tab <- tkframe(notebook.main.tools.tab, relief = 'ridge',
                            borderwidth = 5)
-tkgrid(frame.tools.tab, column = 0, row = 1)
 
-listbox.title.norm <- tklistbox(frame.tools.tab, height = 1, width = 38, 
-                                relief = 'flat')
-tkgrid(listbox.title.norm, sticky = "n", columnspan = 2)  
-tkinsert(listbox.title.norm, 0, "      select samples for normalization")
+tkgrid(tklabel(frame.tools.tab, text = "select samples for normalization"), 
+       columnspan = 2)
 
 listbox.title.div <- tklistbox(frame.tools.tab, height = 1, width = 7, 
                                relief = 'flat')
@@ -1216,12 +1330,13 @@ tkgrid(combobox.denominator, sticky = "w", column = 1, row = 2, padx = c(0, 16),
 
 tkgrid(tkbutton(frame.tools.tab, text = '      Create       ', 
                 command = function() MakeNormFile()), columnspan = 2) 
+tkgrid(frame.tools.tab, column = 0, row = 1)
 
 # box for plot settings
 frame.sort.tools.tab <- tkframe(notebook.main.tools.tab, relief = 'ridge', 
                                 borderwidth = 5)
 
-tkgrid(tklabel(frame.sort.tools.tab, text = "Sort tools", width = 12)) 
+tkgrid(tklabel(frame.sort.tools.tab, text = "Sort tools"), columnspan = 2) 
 
 tkgrid(tklistbox(frame.sort.tools.tab, listvariable = tclVar(""), 
                  height = 1, width = 1, relief = 'flat'),
