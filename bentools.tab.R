@@ -229,7 +229,7 @@ LoadTableFile <- function() {
       return ()
     } else {
       legend.nickname <- strsplit(unlist(strsplit(as.character(file.name), 
-                                                  '.tab')[[1]][1]), '[.]')[[1]]
+                                                  '.tab')[[1]][1]), '[!]')[[1]]
       legend.nickname <- legend.nickname[floor(mean(seq_along(legend.nickname)))]
       tablefile <- read.table(full.file.name, header = TRUE, 
                               stringsAsFactors = FALSE, comment.char = "")
@@ -269,8 +269,12 @@ LoadTableFile <- function() {
       
       color.safe <- file.count %% length(kListColorSet[[control.state[1]]])
       if (color.safe == 0) {
-        color.safe <- file.count
+        color.safe <- 1
       }
+      if (legend.nickname %in% sapply(list.genefile.info$main, "[[", 2)){
+        legend.nickname <- paste(legend.nickname, "rep?")
+      }
+       
       
       list.genefile.info$main[file.name] <<- list(c(file.name, 
               legend.nickname, kDotOptions[1], kLineOptions[1],
@@ -393,7 +397,7 @@ MakeNormFile <- function() {
   
     color.safe <- file.count %% length(kListColorSet[[control.state[1]]])
     if (color.safe == 0 ) {
-      color.safe <- file.count
+      color.safe <- 1
     }
     list.genefile.info$main[[file.name]] <<- c(file.name, file.nickname, 
               kDotOptions[1], kLineOptions[1], 
@@ -759,11 +763,16 @@ ComboboxsGeneSet2 <- function() {
 # saves current seletion
 ComboboxsUpdateVaribles <- function() {
   num <- tclvalue(tkget(combobox.file))
-  if(!is.null(names(list.tablefile)) & control.state[3] == 0){
+  if (!is.null(names(list.tablefile)) & control.state[3] == 0) {
     list.genefile.info$main[[num]][5] <<- tclvalue(tkget(combobox.color))
     list.genefile.info$main[[num]][4] <<- tclvalue(tkget(combobox.lines))
     list.genefile.info$main[[num]][3] <<- tclvalue(tkget(combobox.dots))
+    legend.nicknames <- tclvalue(tkget(entry.nickname))
     list.genefile.info$main[[num]][2] <<- tclvalue(tkget(entry.nickname))
+    if (sum(duplicated(sapply(list.genefile.info$main, "[[", 2))) > 0) {
+      list.genefile.info$main[[num]][2] <<- paste(tclvalue(
+        tkget(entry.nickname)), "rep?")
+    }
     return (ComboboxsUpdate())
   } 
 }
@@ -788,7 +797,7 @@ ComboboxsColorSets <- function() {
           combobox.color.sets))]][ifelse(i %% num2 > 0, i %% num2, i)])  
       color.safe <- num %% num2
       if (color.safe == 0 ) {
-        color.safe <- num
+        color.safe <- 1
       }
       tkset(combobox.color, kListColorSet[[tclvalue(tkget(
         combobox.color.sets))]][color.safe])  
