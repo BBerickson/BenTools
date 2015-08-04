@@ -190,15 +190,27 @@ MoveSelectToOtherEntry <- function(onlist, offlist){
 }
 
 # updates items in lists when tab is displaid
-UpdateEntrys <- function(onlist, offlist, list.item){
+UpdateEntrys <- function(list.item){
+  onlist <- get(paste("listbox." , list.item, ".on", sep = "")) 
+  offlist <- get(paste("listbox." , list.item, ".off", sep = ""))
+  if (list.item != "common"){
+    genelist <- tclvalue(tkcget(get(paste("label." , list.item, ".file", 
+                            sep = "")), text = NULL))
+  } else {
+    genelist <- list.item
+  }
+  genelength <- get(paste("label." , list.item, ".length", sep = ""))
+  
   keep.on <- NULL
   keep.off <- NULL
   tkdelete(onlist, 0, "end")
   tkdelete(offlist, 0, "end")
-  lapply(list.genefile.info[[list.item]], function(j) 
+  lapply(list.genefile.info[[genelist]], function(j) 
     ifelse(j[6] == 1, 
            keep.on <<- c(keep.on,j[1]), 
            keep.off <<- c(keep.off,j[1])))
+  tkconfigure(genelength, 
+              text = paste("n = ", length(list.genefile[[genelist]])))
   tkconfigure(onlist, listvariable=tclVar(as.character(keep.on)))
   tkconfigure(offlist, listvariable=tclVar(as.character(keep.off)))
 }
@@ -394,30 +406,39 @@ LoadGeneFile <- function(on.listbox, off.listbox, label.file, label.count) {
 
 #removes file
 RemoveFile <- function() {
-  if (!is.null(names(list.tablefile)) & control.state[3] == 0 & 
-      length(names(list.tablefile)) > 1) {
-    list.tablefile[[num]] <<- NULL
-    list.tablefile.info[[num]] <<- NULL
-    gene.names <- NULL
-    lapply(names(list.tablefile), function(i) gene.names <<- c(gene.names, 
-                                            unique(list.tablefile[[i]][ ,1])))
-    if (length(names(list.tablefile)) > 1) {
-      gene.names <- gene.names[duplicated(gene.names)]
+  if (control.state[3] == 0 & length(names(list.tablefile)) > 0) {
+    for (i in as.integer(tkcurselection(listbox.common.on))) {
+      filename <- tclvalue(tkget(listbox.common.on, i))
+      list.tablefile[[filename]] <<- NULL
+      list.tablefile.info[[filename]] <<- NULL
+      sapply(names(list.genefile.info),
+             function(k) list.genefile.info[[k]][[filename]] <<-NULL)
     }
-      list.genefile$common <<- gene.names
-      # _TODO?
-    # update list.genefile[[]]$common all but $main ... look at rapply
-    sapply(names(list.genefile.info), 
-           function(i) list.genefile.info[[i]][[num]] <<-NULL)
-    UpdateEntrys(listbox.common.on, listbox.common.off, "common")
-    tkconfigure(combobox.file, 
-                values = sapply(list.genefile.info$common, "[[", 1))
-    tkset(combobox.file, names(list.tablefile)[1])
-    tkconfigure(label.common.length, 
-                text = paste("n = ", length(list.genefile$common)))
+    for (i in as.integer(tkcurselection(listbox.common.off))) {
+      filename <- tclvalue(tkget(listbox.common.off, i))
+      list.tablefile[[filename]] <<- NULL
+      list.tablefile.info[[filename]] <<- NULL
+      sapply(names(list.genefile.info),
+             function(k) list.genefile.info[[k]][[filename]] <<-NULL)
+    }
+    if (length(names(list.tablefile)) > 1) {
+    gene.names <- c(sapply(names(list.tablefile), function(i)  
+                                             unique(list.tablefile[[i]][ ,1])))
+    
+      gene.names <- gene.names[duplicated(gene.names)]
+    } else if (legth(names(list.tablefile)) == 1) {
+      gene.names <- unique(list.tablefile[[1]][ ,1])
+    } else {
+      # TODO add reset function
+      tkmessageBox(message = " have not made a restart funciton yet!!! ")
+      tkdestroy(root)
+    }
+    list.genefile$common <<- gene.names
+    UpdateEntrys("common")
+    tkconfigure(combobox.file, values = names(list.tablefile))
+    tkset(combobox.file, last(names(list.tablefile)))
     return (ComboboxsUpdate())
   }
-  # TODO if last one ask for reset
 }
 
 #get file to add more custome color options
@@ -846,18 +867,13 @@ ComboboxsUpdate <- function() {
   if (file.name == "list of table files") {
     file.name <- "common"
   }
-  
-  cfile <- tclvalue(tkget(combobox.file))
   if (!is.null(names(list.tablefile)) & control.state[3] == 0) {
-    tkset(combobox.color, sapply(list.genefile.info[file.name][[1]],
-                                 "[[", 5)[cfile])
-    tkset(combobox.lines, sapply(list.genefile.info[file.name][[1]],
-                                 "[[", 4)[cfile])
-    tkset(combobox.dots, sapply(list.genefile.info[file.name][[1]],
-                                "[[", 3)[cfile])
+    cfile <- tclvalue(tkget(combobox.file))
+    tkset(combobox.color, list.genefile.info[[file.name]][[cfile]][5])
+    tkset(combobox.lines, list.genefile.info[[file.name]][[cfile]][4])
+    tkset(combobox.dots, list.genefile.info[[file.name]][[cfile]][3])
     tkdelete(entry.nickname, 0, 'end')
-    tkinsert(entry.nickname,  0, sapply(list.genefile.info[file.name][[1]], 
-                                        "[[", 2)[cfile])
+    tkinsert(entry.nickname,  0, list.genefile.info[[file.name]][[cfile]][2])
     tkconfigure(listbox.stats, listvariable = 
                   tclVar(as.character(list.tablefile.info[[cfile]][2:3])))
   } 
@@ -881,13 +897,9 @@ ComboboxsGeneSet2 <- function() {
                                           "\n")[[1]], collapse = " "))
   tmp <- strsplit(tclvalue(tkget(combobox.gene.set)), " " )[[1]]
   if (length(tmp) == 3) {
-    UpdateEntrys(get(paste("listbox.gene" , tmp[3], ".on", sep = "")), 
-                 get(paste("listbox.gene" , tmp[3], ".off", sep = "")), 
-                 tclvalue(tkcget(get(paste("label.gene" , tmp[3], ".file", 
-                                           sep = "")), text = NULL)))
+    UpdateEntrys(paste("gene" , tmp[3], sep = ""))
   }
   ComboboxsUpdate()
-  print("3")
 }
 
 # saves current seletion
@@ -1167,6 +1179,7 @@ combobox.file <- tk2combobox(frame.geneset.file.select,
             textvariable = tcl.start.tablefile, state = "readonly", width = 25)
 tkgrid(combobox.file, column = 1, row = 2)
 tkbind(combobox.file, "<<ComboboxSelected>>", ComboboxsUpdate)
+#TODO fix
 tkbind(combobox.file, "<Double-Button-1>", LoadTableFile)
 
 tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("nickname:"),
@@ -1252,7 +1265,8 @@ tkbind(notebook.on.off.common.tab, "<Visibility>", ComboboxsGeneSet2)
 
 frame.common.tab <- tkframe(notebook.on.off.common.tab)
 
-tkgrid(tklabel(frame.common.tab, text = "list of table files"), columnspan = 3)
+label.common.file <- tklabel(frame.common.tab, text = "list of table files")
+tkgrid(label.common.file, columnspan = 3)
 label.common.length <- tklabel(frame.common.tab, text = "n = ")
 tkgrid(label.common.length, columnspan = 3)
 
@@ -1271,11 +1285,11 @@ listbox.common.off <- tk2listbox(frame.common.tab, width = 37, height = 5)
 tkgrid(listbox.common.off, columnspan = 3)
 
 tkgrid(tkbutton(frame.common.tab, text = " Load table file ", 
-                font =c('bold', 10),
+                font =c('bold', 8),
                command =  function() LoadTableFile()), row = 7, 
        columnspan = 2, sticky = 'w', padx = c(3, 0))
-tkgrid(tkbutton(frame.common.tab, text = " Remove selected file ",
-                font =c('bold', 10),
+tkgrid(tkbutton(frame.common.tab, text = " Remove selected file(s) ",
+                font =c('bold', 8),
                command =  function() RemoveFile()), row = 7, 
        column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
 
@@ -1311,8 +1325,8 @@ tkgrid(tkbutton(frame.gene1.tab, text = " Load gene list ",
                                                    label.gene1.length)), 
        row = 7, 
        columnspan = 2, sticky = 'w', padx = c(3, 0))
-tkgrid(tkbutton(frame.gene1.tab, text = " Remove list ",
-                command =  function() RemoveFile()), row = 7, 
+tkgrid(tkbutton(frame.gene1.tab, text = " place holder ",
+                command =  function() OnOk()), row = 7, 
        column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
 tkgrid(frame.gene1.tab)
 
@@ -1346,8 +1360,8 @@ tkgrid(tkbutton(frame.gene2.tab, text = " Load gene list ",
                                                    label.gene2.length)), 
        row = 7, 
        columnspan = 2, sticky = 'w', padx = c(3, 0))
-tkgrid(tkbutton(frame.gene2.tab, text = " Remove list ",
-                command =  function() RemoveFile()), row = 7, 
+tkgrid(tkbutton(frame.gene2.tab, text = " place holder ",
+                command =  function() OnOk()), row = 7, 
        column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
 tkgrid(frame.gene2.tab)
 
@@ -1381,8 +1395,8 @@ tkgrid(tkbutton(frame.gene3.tab, text = " Load gene list ",
                                                    label.gene3.length)), 
        row = 7, 
        columnspan = 2, sticky = 'w', padx = c(3, 0))
-tkgrid(tkbutton(frame.gene3.tab, text = " Remove list ",
-                command =  function() RemoveFile()), row = 7, 
+tkgrid(tkbutton(frame.gene3.tab, text = " place holder ",
+                command =  function() OnOk()), row = 7, 
        column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
 tkgrid(frame.gene3.tab)
 
@@ -1416,8 +1430,8 @@ tkgrid(tkbutton(frame.gene4.tab, text = " Load gene list ",
                                                    label.gene4.length)),
        row = 7, 
        columnspan = 2, sticky = 'w', padx = c(3, 0))
-tkgrid(tkbutton(frame.gene4.tab, text = " Remove list ",
-                command =  function() RemoveFile()), row = 7, 
+tkgrid(tkbutton(frame.gene4.tab, text = " place holder ",
+                command =  function() OnOk()), row = 7, 
        column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
 tkgrid(frame.gene4.tab)
 
