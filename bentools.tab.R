@@ -55,21 +55,21 @@ if (require("dplyr")){
   
 
 # file list varibles  ----
-list.tablefile <- list()  # for holding table files in list
-                          # [[]] gene X1 X2 ...
-list.tablefile.info <- list()  # for holding table file info, 
-                               # c(full_name, NAs, Zeros)
-list.genefile <- list()  # for holding common genes from files and gene files
-list.genefile.info <- list()  # for holding gene file info
-                              # c(name, nickname, dot", line", color, plot yes/no)
+list.tablefile <- list()      # for holding table files in list
+                              #   [[]] gene X1 X2 ...
+list.genefile <- list()       # holds common genes from files and gene files
+list.genefile.info <- list()  # for holding gene file info in a list of lists
+                              # c(name, nickname, dot", line", color, 
+                              #   plot yes/no, stat1, stat2)
 
 # R varibles ----
 # TODO do i use all of these ?
-control.state <- c("color.set1", 0, 0, 1)  # state of the GUI and control functions
-                                          # [1] active color set, 
-                                          # [2] allows nickname update, 
-                                          # [3] busy? stop user input/activity, 
-                                          # [4] master plot check
+# state of the GUI and control functions
+# [1] active color set, 
+# [2] allows nickname update, 
+# [3] busy? stop user input/activity, 
+# [4] master plot check
+control.state <- c("color.set1", 0, 0, 1)  
 
 # values for comboboxs ----
 
@@ -307,12 +307,6 @@ LoadTableFile <- function() {
         list.genefile$common <<- unique(tablefile[ ,1])
       }
       file.count <- file.count + 1
-      list.tablefile.info[file.name] <<- list(c(full.file.name, 
-              paste(" % NA's = ", round((sum(is.na(tablefile)) / 
-                   (num.bins[1] * num.bins[2])) * 100, digits = 2)), 
-              paste(" % Zeors = ", round((sum(tablefile == 0) / 
-                    (num.bins[1] * num.bins[2])) * 100, digits = 2))))
-      
       color.safe <- file.count %% length(kListColorSet[[control.state[1]]])
       if (color.safe == 0) {
         color.safe <- 1
@@ -332,7 +326,12 @@ LoadTableFile <- function() {
         }
         list.genefile.info[[k]][file.name] <<- list(c(file.name, 
               legend.nickname, kDotOptions[1], kLineOptions[1],
-              kListColorSet[[control.state[1]]][color.safe], 1))})
+              kListColorSet[[control.state[1]]][color.safe], 1, 
+              paste(" % NA's = ", round((sum(is.na(tablefile)) / 
+                            (num.bins[1] * num.bins[2])) * 100, digits = 2)), 
+              paste(" % Zeors = ", round((sum(tablefile == 0) / 
+                            (num.bins[1] * num.bins[2])) * 100, digits = 2))))
+      })
       
       list.tablefile[file.name] <<- list(tablefile)
       tkinsert(listbox.common.on, 'end', file.name)
@@ -387,15 +386,22 @@ LoadGeneFile <- function(on.listbox, off.listbox, label.file, label.count) {
       legend.nickname <- legend.nickname[floor(mean(
         seq_along(legend.nickname)))]
       list.genefile[legend.name] <<- list(unique(genefile[ , 1]))
-      list.genefile.info[legend.name] <<- list(lapply(list.genefile.info$common,
-                  function(i) c(i[[1]], paste(i[[2]], 
-                                legend.nickname , sep = "-"), 
-                                i[[3]], i[[4]], i[[5]], i[[6]])))
-#       list.tablefile.info[legend.name] <<- list(c(full.file.name, 
-#                          paste("n = " , length(list.genefile[legend.name])), 
-#                          paste("genes in common n = ")))
+      genelist.count <- length(list.genefile[[legend.name]])
+      # TODO fix
+      enesg <- data.frame(gene = list.genefile[[legend.name]], 
+                          stringsAsFactors = FALSE)
+      enesg2 <- data.frame(gene = list.genefile$common, 
+                          stringsAsFactors = FALSE)
+      genelist.count2 <- length(unlist(inner_join(enesg, enesg2, by = "gene")))
+      list.genefile.info[legend.name] <<- list(lapply(
+        list.genefile.info$common, function(i) c(i[[1]], paste(i[[2]], 
+                            legend.nickname , sep = "-"), 
+                            i[[3]], i[[4]], i[[5]], i[[6]], 
+                            paste("genes in file = " , genelist.count), 
+                            paste("genes in common n = ", genelist.count2))))
       tkconfigure(label.file, text = legend.name)
-      tkconfigure(label.count, text = paste("genes in common n = "))
+      tkconfigure(label.count, text = paste("genes in common n = ", 
+                                            genelist.count2))
       MoveAllToOtherEntry(on.listbox, off.listbox, "on")
       }
     tcl("wm", "attributes", root, topmost = TRUE)
@@ -410,14 +416,12 @@ RemoveFile <- function() {
     for (i in as.integer(tkcurselection(listbox.common.on))) {
       filename <- tclvalue(tkget(listbox.common.on, i))
       list.tablefile[[filename]] <<- NULL
-      list.tablefile.info[[filename]] <<- NULL
       sapply(names(list.genefile.info),
              function(k) list.genefile.info[[k]][[filename]] <<-NULL)
     }
     for (i in as.integer(tkcurselection(listbox.common.off))) {
       filename <- tclvalue(tkget(listbox.common.off, i))
       list.tablefile[[filename]] <<- NULL
-      list.tablefile.info[[filename]] <<- NULL
       sapply(names(list.genefile.info),
              function(k) list.genefile.info[[k]][[filename]] <<-NULL)
     }
@@ -509,17 +513,16 @@ MakeNormFile <- function() {
                            list.genefile.info$common[[dnom]][2], sep = "/")
     list.tablefile[[file.name]] <<- new.tablefile
     file.count <- length(list.tablefile)
-    list.tablefile.info[[file.name]] <<- c(file.name, 
-                                           paste(" 0's, NA's now = min/2"),
-                                           paste(new.min.for.na))
-  
+   
     color.safe <- file.count %% length(kListColorSet[[control.state[1]]])
     if (color.safe == 0 ) {
       color.safe <- 1
     }
     list.genefile.info$common[[file.name]] <<- c(file.name, file.nickname, 
               kDotOptions[1], kLineOptions[1], 
-              kListColorSet[[control.state[1]]][color.safe], 1)
+              kListColorSet[[control.state[1]]][color.safe], 1, 
+              paste(" 0's, NA's now = min/2"),
+              paste(new.min.for.na))
   
     tkinsert(listbox.common.on, 'end', file.name)
     tkconfigure(combobox.file, 
@@ -875,7 +878,7 @@ ComboboxsUpdate <- function() {
     tkdelete(entry.nickname, 0, 'end')
     tkinsert(entry.nickname,  0, list.genefile.info[[file.name]][[cfile]][2])
     tkconfigure(listbox.stats, listvariable = 
-                  tclVar(as.character(list.tablefile.info[[cfile]][2:3])))
+          tclVar(as.character(list.genefile.info[[file.name]][[cfile]][7:8])))
   } 
 }
 
