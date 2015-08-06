@@ -60,7 +60,7 @@ list.tablefile <- list()      # for holding table files in list
 list.genefile <- list()       # holds common genes from files and gene files
 list.genefile.info <- list()  # for holding gene file info in a list of lists
                               # c(name, nickname, dot", line", color, 
-                              #   plot yes/no, stat1, stat2)
+                              #   plot yes/no, stat1, stat2, colorset)
 
 # R varibles ----
 # TODO do i use all of these ?
@@ -131,7 +131,6 @@ tcl.start.pos.four.line <- tclVar(list.plot.lines[[1]][4])
 tcl.start.pos.plot.ticks <- tclVar(list.plot.ticks[[1]][[2]])
 tcl.checkbox.relative.frequency <- tclVar(0)
 tcl.checkbox.log2 <- tclVar(0)
-tcl.checkbox.use.colorset <- tclVar(0)
 
 # test function ----
 OnOk <- function(){
@@ -139,12 +138,6 @@ OnOk <- function(){
 }
 
 # entry frame functions ----
-
-# keeps numbers, empty string for the rest
-# from https://github.com/gsk3/taRifx/blob/master/R/Rfunctions.R#L1161
-Destring <- function(x, keep = "0-9.-") {
-  return(as.numeric(gsub(paste("[^", keep, "]+", sep=""), "", x)))
-}
 
 #moves all items from one list to the other
 MoveAllToOtherEntry <- function(onlist, offlist, direction){
@@ -217,6 +210,18 @@ UpdateEntrys <- function(list.item){
   
 
 # helper functions ----
+
+# keeps numbers, empty string for the rest
+# from https://github.com/gsk3/taRifx/blob/master/R/Rfunctions.R#L1161
+Destring <- function(x, keep = "0-9.-") {
+  return(as.numeric(gsub(paste("[^", keep, "]+", sep=""), "", x)))
+}
+
+# basic test for valid colors
+isColor <- function(x) {
+  res <- try(col2rgb(x),silent=TRUE)
+  return(!"try-error"%in%class(res))
+}
 
 # helper for getting selected set 
 ComboboxSelectionHelper <- function() {
@@ -307,7 +312,7 @@ LoadTableFile <- function() {
         list.genefile$common <<- unique(tablefile[ ,1])
       }
       file.count <- file.count + 1
-      color.safe <- file.count %% length(kListColorSet[[control.state[1]]])
+      color.safe <- file.count %% length(kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
       if (color.safe == 0) {
         color.safe <- 1
       }
@@ -326,11 +331,13 @@ LoadTableFile <- function() {
         }
         list.genefile.info[[k]][file.name] <<- list(c(file.name, 
               legend.nickname, kDotOptions[1], kLineOptions[1],
-              kListColorSet[[control.state[1]]][color.safe], 1, 
+              kListColorSet[[tclvalue(tkget(combobox.color.sets))]][color.safe], 
+              1, 
               paste(" % NA's = ", round((sum(is.na(tablefile)) / 
                             (num.bins[1] * num.bins[2])) * 100, digits = 2)), 
               paste(" % Zeors = ", round((sum(tablefile == 0) / 
-                            (num.bins[1] * num.bins[2])) * 100, digits = 2))))
+                            (num.bins[1] * num.bins[2])) * 100, digits = 2)),
+              tclvalue(tkget(combobox.color.sets))))
       })
       
       list.tablefile[file.name] <<- list(tablefile)
@@ -398,7 +405,8 @@ LoadGeneFile <- function(on.listbox, off.listbox, label.file, label.count) {
                             legend.nickname , sep = "-"), 
                             i[[3]], i[[4]], i[[5]], i[[6]], 
                             paste("genes in file = " , genelist.count), 
-                            paste("genes in common n = ", genelist.count2))))
+                            paste("genes in common n = ", genelist.count2),
+                            i[9])))
       tkconfigure(label.file, text = legend.name)
       tkconfigure(label.count, text = paste("genes in common n = ", 
                                             genelist.count2))
@@ -455,29 +463,44 @@ GetColor <- function() {
                                           "{{color.txt Files} {.color.txt}}"))
     if (!nchar(full.file.name)) { ## file select test
       control.state[3] <<- 0
+      tcl("wm", "attributes", root, topmost = TRUE)
       return ()
-    } else if (full.file.name %in% names(kListColorSet)) {
+    } 
+    
+    split.file.name <- strsplit(as.character(full.file.name), '/') 
+    file.name <- paste(split.file.name[[1]][(length(split.file.name[[1]]))])
+    file.nickname <- paste(strsplit(as.character(file.name), '.txt')[[1]][1])
+    # fix
+    if (full.file.name %in% names(kListColorSet)) {
       tkmessageBox(message = "This file has already been loaded")
       control.state[3] <<- 0
       tcl("wm", "attributes", root, topmost = TRUE)
       return ()
     } else {
-      split.file.name <- strsplit(as.character(full.file.name), '/') 
-      file.name <- paste(split.file.name[[1]][(length(split.file.name[[1]]))])
-      file.nickname <- paste(strsplit(as.character(file.name), '.txt')[[1]][1])
+      
       color.file <- read.table(full.file.name, header = FALSE, 
                                stringsAsFactors = FALSE)
-      # checks if in rgb format and converts to hex
-      sapply(seq_along(color.file[[1]]), function(i) 
+      # checks if in rgb format and converts to hex and if is a color
+      sapply(seq_along(color.file[[1]]), function(i) {
         if (suppressWarnings(!is.na(as.numeric(
           substr(color.file[[1]][i], 1, 1)))) == TRUE) { 
           red.green.blue <- strsplit(color.file[[1]][i], ",")
-          color.file[[1]][i] <<- rgb(as.numeric(red.green.blue[[1]])[1], 
+          if (length(red.green.blue[[1]]) == 3) {
+            color.file[[1]][i] <<- rgb(as.numeric(red.green.blue[[1]])[1], 
                         as.numeric(red.green.blue[[1]])[2], 
                         as.numeric(red.green.blue[[1]])[3], 
-                        maxColorValue = 255)})
+                        maxColorValue = 255)
+          } else {
+            color.file[[1]][i] <<- "black"
+            }
+        }
+        if (!isColor(color.file[[1]][i])){
+          color.file[[1]][i] <<- "black"
+        }
+      })
+       
       
-      kListColorSet[file.nickname] <<- color.file
+      kListColorSet[file.nickname] <<-  color.file
       tkconfigure(combobox.color.sets, values = names(kListColorSet))
       tkset(combobox.color.sets, file.nickname)
       control.state[3] <<- 0
@@ -514,15 +537,15 @@ MakeNormFile <- function() {
     list.tablefile[[file.name]] <<- new.tablefile
     file.count <- length(list.tablefile)
    
-    color.safe <- file.count %% length(kListColorSet[[control.state[1]]])
+    color.safe <- file.count %% length(kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
     if (color.safe == 0 ) {
       color.safe <- 1
     }
     list.genefile.info$common[[file.name]] <<- c(file.name, file.nickname, 
               kDotOptions[1], kLineOptions[1], 
-              kListColorSet[[control.state[1]]][color.safe], 1, 
+              kListColorSet[[tclvalue(tkget(combobox.color.sets))]][color.safe], 1, 
               paste(" 0's, NA's now = min/2"),
-              paste(new.min.for.na))
+              paste(new.min.for.na), tclvalue(tkget(combobox.color.sets)))
   
     tkinsert(listbox.common.on, 'end', file.name)
     tkconfigure(combobox.file, 
@@ -879,6 +902,7 @@ ComboboxsUpdate <- function() {
     tkinsert(entry.nickname,  0, list.genefile.info[[file.name]][[cfile]][2])
     tkconfigure(listbox.stats, listvariable = 
           tclVar(as.character(list.genefile.info[[file.name]][[cfile]][7:8])))
+    tkset(combobox.color.sets, list.genefile.info[[file.name]][[cfile]][9])
   } 
 }
 
@@ -935,33 +959,31 @@ ComboboxsUpdateVaribles <- function() {
 
 # Adds ability to change color sets
 ComboboxsColorSets <- function() {
-  if (control.state[3] == 0) {
-    num <- as.numeric(tclvalue(tcl(combobox.file, "current"))) + 1
-    num1 <- length(list.tablefile)
-    num2 <- length(kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
-    if (!is.numeric(num2) | num2 < 1){
-      return ()
-    }
-    control.state[1] <<- tclvalue(tkget(combobox.color.sets))
-    if (num < 1) {
-      num <- 1
-    }
-    
-    if (num1 > 0 & as.character(tclvalue(tcl.checkbox.use.colorset)) == 1) {
-      lapply(seq_along(list.tablefile), function(i) 
-        list.genefile.info$common[[i]][5] <<- kListColorSet[[tclvalue(tkget(
-          combobox.color.sets))]][ifelse(i %% num2 > 0, i %% num2, i)])  
-      color.safe <- num %% num2
-      if (color.safe == 0 ) {
-        color.safe <- 1
-      }
-      tkset(combobox.color, kListColorSet[[tclvalue(tkget(
-        combobox.color.sets))]][color.safe])  
-    }  
-    tkconfigure(combobox.color, values = kListColorSet[[tclvalue(tkget(
-      combobox.color.sets))]])  
+  file.name <- ComboboxSelectionHelper()
+  if (file.name == "list of table files") {
+    file.name <- "common"
   }
+  lapply(seq_along(list.tablefile), function(i) {
+    listname <- names(list.tablefile)[i]
+    list.genefile.info[[file.name]][[listname]][9] <<- 
+      tclvalue(tkget(combobox.color.sets))
+        
+    color.safe <- i %% 
+      length(kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
+    if (color.safe == 0) {
+      color.safe <- 1
+    }
+      
+    list.genefile.info[[file.name]][[listname]][5] <<- 
+      kListColorSet[[tclvalue(tkget(combobox.color.sets))]][color.safe]
+  })
+  tkconfigure(combobox.color, 
+              values = kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
+  tkset(combobox.color, 
+        kListColorSet[[tclvalue(tkget(combobox.color.sets))]][1])
+  ComboboxsUpdate()
 }
+
 
 # Change plot labels with lines
 PlotLines <- function() {
@@ -1014,22 +1036,6 @@ notebook.main.plot.options.tab <- tk2notetab(notebook.main, "Plot Options")
 tab.plot.options.color.set.frame <- tkframe(notebook.main.plot.options.tab, 
                                        relief = 'ridge', borderwidth = 5)
 tkgrid(tab.plot.options.color.set.frame, column = 0, row = 0)
-
-tkgrid(tklistbox(tab.plot.options.color.set.frame, 
-                 listvariable = tclVar("colorset"),
-                 height = 1, width = 8, relief = 'flat'), padx = c(5, 0))
-
-combobox.color.sets <- tk2combobox(tab.plot.options.color.set.frame, 
-                                     value = names(kListColorSet), 
-                              textvariable = tcl.start.color.set, 
-                                     state = "readonly",
-                                     width = 10)
-tkgrid(combobox.color.sets, sticky = 'w', padx = c(0,5), column = 1, row = 0)
-tkbind(combobox.color.sets, "<<ComboboxSelected>>", ComboboxsColorSets)
-
-tkgrid(tkcheckbutton(tab.plot.options.color.set.frame, 
-                     variable = tcl.checkbox.use.colorset, 
-                         text = "Update colors" ))
 
 tkgrid(tkbutton(tab.plot.options.color.set.frame, text = ' Load custom color ', 
                 command = function() GetColor()), 
@@ -1195,17 +1201,30 @@ tkgrid(entry.nickname, sticky = "w", column = 1, row = 3, padx = c(0, 4))
 tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("color"), 
                  height = 1, width = 5, relief = 'flat'), padx = c(5, 0))
 
+combobox.color.sets <- tk2combobox(frame.geneset.file.select, 
+                                   value = names(kListColorSet), 
+                                   textvariable = tcl.start.color.set, 
+                                   state = "readonly",
+                                   width = 10)
 combobox.color <- tk2combobox(frame.geneset.file.select, 
                  value = kListColorSet[[tclvalue(tkget(combobox.color.sets))]], 
                          textvariable= tcl.start.color, state = "readonly")
 tkgrid(combobox.color, sticky = "w", column = 1, row = 4, padx = c(0, 16))
 tkbind(combobox.color, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
 
+tkgrid(tklistbox(frame.geneset.file.select, 
+                 listvariable = tclVar("colorset"),
+                 height = 1, width = 8, relief = 'flat'), padx = c(5, 0))
+
+
+tkgrid(combobox.color.sets, sticky = 'w', padx = c(0,5), column = 1, row = 5)
+tkbind(combobox.color.sets, "<<ComboboxSelected>>", ComboboxsColorSets)
+
 tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("Stats"),
                  height = 1, width = 5, 
                  relief = 'flat'), column = 0, padx = c(5, 0))
 listbox.stats <- tklistbox(frame.geneset.file.select, height = 2, width = 30)
-tkgrid(listbox.stats, column = 1, row = 5)
+tkgrid(listbox.stats, column = 1, row = 6)
 
 # frame for plot button
 
