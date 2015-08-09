@@ -516,15 +516,16 @@ MakeNormFile <- function() {
   dnom <- as.character(tclvalue(tkget(combobox.denominator)))
   # TODO change to more streamed lined and split and divide on len
   if (nom != "numerator" & dnom != "denominator") {  
-    gene.names <- c(list.tablefile[[nom]]["gene"], 
-                    list.tablefile[[dnom]]["gene"])
     new.gene.list <- data.frame(inner_join(list.tablefile[[nom]], 
                                      list.tablefile[[dnom]], by = "gene"), 
                           stringsAsFactors = FALSE)
-    new.gene.list[is.na(new.gene.list)] <- 0
-    len <- (dim(new.gene.list)[2]-1)/2
+    new.gene.list[is.na(new.gene.list)] <- 0  # replace NAs with 0
+    len <- (dim(new.gene.list)[2] - 1) / 2  # find number of bins
+    # find min value /2 to replace 0s 
     new.min.for.na <- min(new.gene.list[, -1][new.gene.list[ ,-1] > 0])/2
-    new.gene.list[ ,-1] <- as.data.frame(lapply(new.gene.list[ ,-1], 
+    # replace 0's with min/2
+    new.gene.list[ , -1] <- 
+      as.data.frame(lapply(new.gene.list[ , -1], 
              function(x) {replace(x, x == 0, new.min.for.na)}), 
              stringsAsFactors = FALSE)
     new.tablefile <- data.frame(gene = new.gene.list[ ,1], 
@@ -537,15 +538,18 @@ MakeNormFile <- function() {
     list.tablefile[[file.name]] <<- new.tablefile
     file.count <- length(list.tablefile)
    
-    color.safe <- file.count %% length(kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
+    color.safe <- file.count %% 
+      length(kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
     if (color.safe == 0 ) {
       color.safe <- 1
     }
     list.genefile.info$common[[file.name]] <<- c(file.name, file.nickname, 
-              kDotOptions[1], kLineOptions[1], 
-              kListColorSet[[tclvalue(tkget(combobox.color.sets))]][color.safe], 1, 
-              paste(" 0's, NA's now = min/2"),
-              paste(new.min.for.na), tclvalue(tkget(combobox.color.sets)))
+            kDotOptions[1], kLineOptions[1], 
+            kListColorSet[[tclvalue(tkget(combobox.color.sets))]][color.safe],
+            1, 
+            paste(" 0's, NA's now = min/2"),
+            paste(new.min.for.na), 
+            tclvalue(tkget(combobox.color.sets)))
   
     tkinsert(listbox.common.on, 'end', file.name)
     tkconfigure(combobox.file, 
@@ -554,10 +558,11 @@ MakeNormFile <- function() {
                 values = sapply(list.genefile.info$common, "[[", 1))
     tkconfigure(combobox.denominator, 
                 values = sapply(list.genefile.info$common, "[[", 1))
-    tkset(combobox.file, last(sapply(list.genefile.info$common, "[[", 1)))
+    tkset(combobox.file, file.name)
     tkset(combobox.numerator, "numerator")
     tkset(combobox.denominator, "denominator")
     ComboboxsUpdate()
+    UpdateEntrys("common")
   }  
 }
 
@@ -1023,67 +1028,56 @@ tkadd(menu.top.file, "command", label = "Restart", command = function()
   tkdestroy(root))
 tkadd(menu.top, "cascade", label = "File", menu = menu.top.file)
 
-# create main notebook ----
-notebook.main <- tk2notebook(root, tabs = c("Plot", "Genes", "Tools", 
-                                            "Plot Options"))
-tkgrid(notebook.main, column = 1, row = 0)
+# frame for constent items ----
+frame.common.items <- tkframe(root)
 
-# tab for Plot Options  ----
-notebook.main.plot.options.tab <- tk2notetab(notebook.main, "Plot Options")
+# frame for notebook, math, line dot plot options
+frame.notebook.math.options <- tkframe(frame.common.items, relief = 'ridge',
+                                       borderwidth = 6) 
+notebook.math.options <- tk2notebook(frame.notebook.math.options, 
+                             tabs = c("Math", 
+                                      "Lines & Lables", "Norm Files",
+                                      "Extra Options"))
+tkgrid(notebook.math.options)
 
-# frame for loading and applying diffrent color groups
+# tab for Math Plot Options ----
+notebook.math.tab <- tk2notetab(notebook.math.options, "Math")
+frame.plot.math.settings <- tkframe(notebook.math.tab, 
+                                    relief = 'ridge', borderwidth = 5)
 
-tab.plot.options.color.set.frame <- tkframe(notebook.main.plot.options.tab, 
-                                       relief = 'ridge', borderwidth = 5)
-tkgrid(tab.plot.options.color.set.frame, column = 0, row = 0)
+tkgrid(tklabel(frame.plot.math.settings, text = "Math", width = 35))  
 
-tkgrid(tkbutton(tab.plot.options.color.set.frame, text = ' Load custom color ', 
-                command = function() GetColor()), 
-                   pady = c(15, 0), columnspan = 2) 
+combobox.math <- tk2combobox(frame.plot.math.settings, 
+                             value = kMathOptions, 
+                             textvariable = tcl.start.math.option, 
+                             state = "readonly")
+tkgrid(combobox.math, sticky = "n")
 
-tkgrid(tklistbox(tab.plot.options.color.set.frame, 
-                 listvariable = tclVar("Line"), height = 1, width = 4, 
-                 relief = 'flat'), padx = c(20, 0))
+checkbox.relative.frequency <- tkcheckbutton(frame.plot.math.settings, 
+                                  variable = tcl.checkbox.relative.frequency, 
+                                  text = "Relative Frequency" )
+tkgrid(checkbox.relative.frequency)
 
-combobox.lines <- tk2combobox(tab.plot.options.color.set.frame, 
-                               value = kLineOptions, 
-                        textvariable = tcl.start.line.option, state="readonly",
-                        width = 10)
-tkgrid(combobox.lines, sticky = "w", column = 1, row = 3, padx = c(0, 16)) 
-tkbind(combobox.lines, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
+checkbox.log2 <- tkcheckbutton(frame.plot.math.settings, 
+                    variable = tcl.checkbox.log2, text = "log2 transformation")
+tkgrid(checkbox.log2)
 
-tkgrid(tklistbox(tab.plot.options.color.set.frame, 
-                 listvariable = tclVar("dot"),
-                 height = 1, width = 4, relief = 'flat'), padx = c(20, 0))
+tkgrid(tklistbox(frame.plot.math.settings, 
+                 listvariable = tclVar("Norm_to_bin"),
+                 height = 1, width = 12, 
+                 relief = 'flat'), padx = c(50, 0), sticky = "w")
 
-combobox.dots <- tk2combobox(tab.plot.options.color.set.frame, 
-                             value = kDotOptions, 
-                       textvariable = tcl.start.dot.option, state="readonly", 
-                       width = 10) 
-tkgrid(combobox.dots, sticky = "w", column = 1, row = 4, padx = c(0, 16)) 
-tkbind(combobox.dots, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
+combobox.norm.bin <- tk2combobox(frame.plot.math.settings,
+                textvariable = tcl.start.norm.bin, state="readonly", width = 3)
+tkgrid(combobox.norm.bin, sticky = "e", column = 0, row = 4, padx = c(0, 50))
 
-tkgrid(tklabel(tab.plot.options.color.set.frame, text = "Header"), 
-       padx = c(5, 1), pady = c(0, 2))
-tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20, 
-                textvariable = tcl.header), padx = c(5, 0), pady = c(0, 2), 
-       column = 1, row = 5)
+tkgrid(frame.plot.math.settings)
 
-tkgrid(tklabel(tab.plot.options.color.set.frame, text = "Header"), 
-       padx = c(5, 1), pady = c(0, 2))
-tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20, 
-                textvariable = tcl.header),  padx = c(5, 0), pady = c(0, 2), 
-       column = 1, row = 6)
+# tab for line and tick plot options ---- 
+notebook.lines.lables.tab <- tk2notetab(notebook.math.options, 
+                                        "Lines & Lables")
 
-tkgrid(tklabel(tab.plot.options.color.set.frame, text = "Header"), 
-       padx = c(5, 1), pady = c(0, 2))
-tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20, 
-                textvariable = tcl.header), padx = c(5, 0), pady = c(0, 2), 
-       column = 1, row = 7)
-
-#frame for line and tick plot options
-
-tab.plot.options.line.tick.frame <- tkframe(notebook.main.plot.options.tab, 
+tab.plot.options.line.tick.frame <- tkframe(notebook.lines.lables.tab, 
                                             relief = 'ridge', borderwidth = 5) 
 tkgrid(tab.plot.options.line.tick.frame)
 
@@ -1103,7 +1097,7 @@ tkbind(combobox.plot.lines, '<<ComboboxSelected>>', PlotLines)
 
 tkgrid(tk2entry(tab.plot.options.line.tick.frame, width = 5, 
                 textvariable = tcl.one.tss.tts.option),  
-                padx = c(10, 0), pady = c(5, 0), column = 0, row = 8)
+       padx = c(10, 0), pady = c(5, 0), column = 0, row = 8)
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), padx = c(5, 3), 
        pady = c(5, 0), column = 1, row = 8, sticky = "w")
 entry.line.tick.pos.one <- tk2entry(tab.plot.options.line.tick.frame, 
@@ -1129,7 +1123,8 @@ tkgrid(tk2entry(tab.plot.options.line.tick.frame, width = 5,
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), 
        padx = c(5, 3), pady = c(5, 0), column = 4, row = 8, sticky = "w")
 entry.line.tick.pos.three <- tk2entry(tab.plot.options.line.tick.frame, 
-                            width = 4, textvariable = tcl.start.pos.three.line)
+                                      width = 4, 
+                                      textvariable = tcl.start.pos.three.line)
 tkgrid(entry.line.tick.pos.three, column = 5, row = 8, sticky = "w", 
        padx = c(0, 0), pady = c(3, 0))
 
@@ -1139,7 +1134,8 @@ tkgrid(tk2entry(tab.plot.options.line.tick.frame, width = 5,
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), column = 4, 
        row = 9, sticky = "w", padx = c(5, 3), pady = c(5, 0))
 entry.line.tick.pos.four <- tk2entry(tab.plot.options.line.tick.frame, 
-                            width = 4, textvariable = tcl.start.pos.four.line)
+                                     width = 4, 
+                                     textvariable = tcl.start.pos.four.line)
 tkgrid(entry.line.tick.pos.four, column = 5, row = 9, sticky = "w", 
        padx = c(0, 0), pady = c(3, 0))
 
@@ -1149,21 +1145,108 @@ tkgrid(tklabel(tab.plot.options.line.tick.frame, text = "More Bin labels"),
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), padx = c(5, 0), 
        column = 0, row = 12, sticky = "w")
 entry.line.tick.pos.five <- tk2entry(tab.plot.options.line.tick.frame, 
-                            width = 35,
-                            textvariable = tcl.start.pos.plot.ticks)
+                                     width = 35,
+                                     textvariable = tcl.start.pos.plot.ticks)
 tkgrid(entry.line.tick.pos.five, column = 1, row = 12, padx = c(0, 0), 
        columnspan = 5, sticky = "w")
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'label'), 
        padx = c(5, 0), column = 0, row = 13, sticky = "w")
 entry.line.tick.label.five <- tk2entry(tab.plot.options.line.tick.frame, 
-                          width = 35, 
-                          textvariable = tcl.start.label.plot.ticks)
+                                    width = 35, 
+                                    textvariable = tcl.start.label.plot.ticks)
 tkgrid(entry.line.tick.label.five, column = 1, row = 13, padx = c(0, 0), 
        columnspan = 5)
 
-# frame for constent items ----
 
-frame.common.items <- tkframe(root)
+tkgrid(frame.notebook.math.options, column = 0, row = 0, padx = c(5,5), 
+       pady = c(0,5),sticky = "n")
+
+# tab for making norm file ----
+notebook.norm.file.tab <- tk2notetab(notebook.math.options, 
+                                             "Norm Files")
+frame.norm.files.tab <- tkframe(notebook.norm.file.tab, relief = 'ridge',
+                           borderwidth = 5)
+
+tkgrid(tklabel(frame.norm.files.tab, text = "select samples for normalization"), 
+       columnspan = 2)
+
+listbox.title.div <- tklistbox(frame.norm.files.tab, height = 1, width = 7, 
+                               relief = 'flat')
+tkgrid(listbox.title.div, padx = c(20, 0), pady = c(5, 0), column = 0, row = 1)  
+tkinsert(listbox.title.div, 0, "divide:")
+
+combobox.numerator <- tk2combobox(frame.norm.files.tab, state = "readonly")
+tkset(combobox.numerator, "numerator")
+tkgrid(combobox.numerator, sticky = "w", column = 1, row = 1, padx = c(0, 16), 
+       pady = c(5, 0)) 
+
+listbox.title.by <- tklistbox(frame.norm.files.tab, height = 1, width = 6, 
+                              relief = 'flat')
+tkgrid(listbox.title.by, padx = c(20, 0), pady = c(0, 5), column = 0, row = 2)  
+tkinsert(listbox.title.by, 0, "by:")
+
+combobox.denominator <- tk2combobox(frame.norm.files.tab, state = "readonly")
+tkset(combobox.denominator, "denominator")
+tkgrid(combobox.denominator, sticky = "w", column = 1, row = 2, 
+       padx = c(0, 16), pady = c(0, 5)) 
+
+tkgrid(tkbutton(frame.norm.files.tab, text = '      Create       ', 
+                command = function() MakeNormFile()), columnspan = 2) 
+tkgrid(frame.norm.files.tab)
+
+
+# tab for extra plot options ----
+notebook.math.plot.options.tab <- tk2notetab(notebook.math.options, 
+                                             "Extra Options")
+
+# frame for loading and applying diffrent color.tet files
+tab.plot.options.color.set.frame <- tkframe(notebook.math.plot.options.tab, 
+                                            relief = 'ridge', borderwidth = 5)
+tkgrid(tab.plot.options.color.set.frame, column = 0, row = 0)
+
+tkgrid(tkbutton(tab.plot.options.color.set.frame, text = ' Load custom color ', 
+                command = function() GetColor()), 
+       pady = c(15, 0), columnspan = 2) 
+
+tkgrid(tklistbox(tab.plot.options.color.set.frame, 
+                 listvariable = tclVar("Line"), height = 1, width = 4, 
+                 relief = 'flat'), padx = c(20, 0))
+
+combobox.lines <- tk2combobox(tab.plot.options.color.set.frame, 
+                              value = kLineOptions, 
+                              textvariable = tcl.start.line.option, state="readonly",
+                              width = 10)
+tkgrid(combobox.lines, sticky = "w", column = 1, row = 1, padx = c(0, 16)) 
+tkbind(combobox.lines, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
+
+tkgrid(tklistbox(tab.plot.options.color.set.frame, 
+                 listvariable = tclVar("dot"),
+                 height = 1, width = 4, relief = 'flat'), padx = c(20, 0))
+
+combobox.dots <- tk2combobox(tab.plot.options.color.set.frame, 
+                             value = kDotOptions, 
+                             textvariable = tcl.start.dot.option, state="readonly", 
+                             width = 10) 
+tkgrid(combobox.dots, sticky = "w", column = 1, row = 2, padx = c(0, 16)) 
+tkbind(combobox.dots, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
+
+tkgrid(tklabel(tab.plot.options.color.set.frame, text = "Header"), 
+       padx = c(5, 1), pady = c(0, 2))
+tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20, 
+                textvariable = tcl.header), padx = c(5, 0), pady = c(0, 2), 
+       column = 1, row = 3)
+
+tkgrid(tklabel(tab.plot.options.color.set.frame, text = "Header"), 
+       padx = c(5, 1), pady = c(0, 2))
+tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20, 
+                textvariable = tcl.header),  padx = c(5, 0), pady = c(0, 2), 
+       column = 1, row = 4)
+
+tkgrid(tklabel(tab.plot.options.color.set.frame, text = "Header"), 
+       padx = c(5, 1), pady = c(0, 2))
+tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20, 
+                textvariable = tcl.header), padx = c(5, 0), pady = c(0, 2), 
+       column = 1, row = 5)
 
 # frame for gene set and file options and info
 frame.geneset.file.select <- tkframe(frame.common.items, relief = 'ridge', 
@@ -1237,41 +1320,14 @@ tkgrid(tkbutton(frame.plot.button, font =c('bold', 23),
                 command = function() MakeDataFrame())) 
 tkgrid(frame.common.items, column = 0, row = 0)
 
-# tab plot ----
-notebook.main.plot.tab <- tk2notetab(notebook.main, "Plot")
+# create main notebook ----
+notebook.main <- tk2notebook(root, tabs = c("On/Off", "Tools1", "Tools2" , 
+                                            "Show Genes", "Tools"))
+tkgrid(notebook.main, column = 1, row = 0)
 
-# box for plot settings
-frame.plot.math.settings <- tkframe(notebook.main.plot.tab, relief = 'ridge',
-                                    borderwidth = 5)
+# on/off main tab ----
+notebook.main.plot.tab <- tk2notetab(notebook.main, "On/Off")
 
-tkgrid(tklabel(frame.plot.math.settings, text = "Plot Options", width = 35))  
-
-combobox.math <- tk2combobox(frame.plot.math.settings, 
-                             value = kMathOptions, 
-                             textvariable = tcl.start.math.option, 
-                             state = "readonly")
-tkgrid(combobox.math, sticky = "n")
-
-checkbox.relative.frequency <- tkcheckbutton(frame.plot.math.settings, 
-                   variable = tcl.checkbox.relative.frequency, 
-                       text = "Relative Frequency" )
-tkgrid(checkbox.relative.frequency)
-
-checkbox.log2 <- tkcheckbutton(frame.plot.math.settings, 
-                  variable = tcl.checkbox.log2, text = "log2 transformation")
-tkgrid(checkbox.log2)
-
-tkgrid(tklistbox(frame.plot.math.settings, 
-                 listvariable = tclVar("Norm_to_bin"),
-                 height = 1, width = 12, 
-                 relief = 'flat'), padx = c(50, 0), sticky = "w")
-
-combobox.norm.bin <- tk2combobox(frame.plot.math.settings,
-                textvariable = tcl.start.norm.bin, state="readonly", width = 3)
-tkgrid(combobox.norm.bin, sticky = "e", column = 0, row = 5, padx = c(0, 50)) 
-tkgrid(frame.plot.math.settings, row = 0, sticky = "n")
-
-# on/off list notebook ---- 
 frame.on.off <- tkframe(notebook.main.plot.tab, relief = 'ridge', 
                         borderwidth = 5)
 
@@ -1307,13 +1363,13 @@ listbox.common.off <- tk2listbox(frame.common.tab, width = 37, height = 5)
 tkgrid(listbox.common.off, columnspan = 3)
 
 tkgrid(tkbutton(frame.common.tab, text = " Load table file ", 
-                font =c('bold', 8),
+                font =c('bold', 15),
                command =  function() LoadTableFile()), row = 7, 
-       columnspan = 2, sticky = 'w', padx = c(3, 0))
+       columnspan = 3)
 tkgrid(tkbutton(frame.common.tab, text = " Remove selected file(s) ",
-                font =c('bold', 8),
-               command =  function() RemoveFile()), row = 7, 
-       column = 1, columnspan = 2, sticky = 'e', padx = c(0, 3))
+                font =c('bold', 10),
+               command =  function() RemoveFile()), row = 8, 
+               columnspan = 3)
 
 tkgrid(frame.common.tab)
 
@@ -1459,94 +1515,13 @@ tkgrid(frame.gene4.tab)
 
 tkgrid(frame.on.off, column = 0, row = 1, rowspan = 2)
 
-# tab for display genes ----
-notebook.main.genes.tab <- tk2notetab(notebook.main, "Genes")
+# tools1 main tab ----
+notebook.main.tools1.tab <- tk2notetab(notebook.main, "Tools1")
 
-frame.genes.tab <- tkframe(notebook.main.genes.tab, relief = 'ridge', 
-                           borderwidth = 5)
-tkgrid(frame.genes.tab, column = 0, row = 0, sticky = "n")
-
-tkgrid(tklistbox(frame.genes.tab, listvariable = tclVar("list:"), height = 1, 
-                 width = 4, relief = 'flat'), padx = c(20, 0))
-combobox.gene.compare <- tk2combobox(frame.genes.tab, 
-                       textvariable = tcl.start.file.compare.names,
-                       state="readonly") 
-tkgrid(combobox.gene.compare, sticky = "w", column = 1, row = 0, 
-       padx = c(0, 16)) 
-
-tkgrid(tkbutton(frame.genes.tab, text = " Show Genes ", 
-                command =  function() ShowGenes()), 
-       column = 0, row = 1, columnspan =2)
-
-tkgrid(tklistbox(frame.genes.tab, listvariable = tclVar(""), height = 1, 
-                 width = 12, 
-                 relief = 'flat'), padx = c(20, 0), column = 0, row = 2)
-
-tkgrid(tklistbox(frame.genes.tab, listvariable = tclVar("compare_to:"), 
-                 height = 1, width = 12, 
-                 relief = 'flat'), padx = c(20, 0), column = 0, row = 3)
-combobox.gene.compare2 <- tk2combobox(frame.genes.tab, 
-                             textvariable = tcl.start.file.compare.names,
-                             state="readonly") 
-tkgrid(combobox.gene.compare2, sticky = "w", column = 1, row = 3, 
-       padx = c(0, 16)) 
-
-tkgrid(tkbutton(frame.genes.tab, text = " intersect list ", 
-                command =  function() OnOk()), 
-       column = 0, row = 4, columnspan =2)
-
-tkgrid(tkbutton(frame.genes.tab, text = " save list ", 
-                command =  function() OnOk()), 
-       column = 0, row = 5, columnspan =2)
-
-frame.show.genes <- tkframe(notebook.main.genes.tab, relief = 'ridge', 
-                            borderwidth = 5)
-tkgrid(frame.show.genes, column = 0, row = 1, sticky = "n")
-
-listbox.title.show.genes <- tklistbox(frame.show.genes, 
-                                    listvariable = tclVar("load_list"), 
-                 relief = 'flat', height = 1, width = 30)
-tkgrid(listbox.title.show.genes, column = 0, row = 0)
-
-listbox.show.genes <- tk2listbox(frame.show.genes, height = 20, width = 30)
-tkgrid(listbox.show.genes, column = 0, row = 1, sticky = "n")
-
-# tab for tools ----
-notebook.main.tools.tab <- tk2notetab(notebook.main, "Tools")
-
-# frame for file deviding 
-frame.tools.tab <- tkframe(notebook.main.tools.tab, relief = 'ridge',
-                           borderwidth = 5)
-
-tkgrid(tklabel(frame.tools.tab, text = "select samples for normalization"), 
-       columnspan = 2)
-
-listbox.title.div <- tklistbox(frame.tools.tab, height = 1, width = 7, 
-                               relief = 'flat')
-tkgrid(listbox.title.div, padx = c(20, 0), pady = c(5, 0), column = 0, row = 1)  
-tkinsert(listbox.title.div, 0, "divide:")
-
-combobox.numerator <- tk2combobox(frame.tools.tab, state = "readonly")
-tkset(combobox.numerator, "numerator")
-tkgrid(combobox.numerator, sticky = "w", column = 1, row = 1, padx = c(0, 16), 
-       pady = c(5, 0)) 
-
-listbox.title.by <- tklistbox(frame.tools.tab, height = 1, width = 6, 
-                              relief = 'flat')
-tkgrid(listbox.title.by, padx = c(20, 0), pady = c(0, 5), column = 0, row = 2)  
-tkinsert(listbox.title.by, 0, "by:")
-
-combobox.denominator <- tk2combobox(frame.tools.tab, state = "readonly")
-tkset(combobox.denominator, "denominator")
-tkgrid(combobox.denominator, sticky = "w", column = 1, row = 2, 
-       padx = c(0, 16), pady = c(0, 5)) 
-
-tkgrid(tkbutton(frame.tools.tab, text = '      Create       ', 
-                command = function() MakeNormFile()), columnspan = 2) 
-tkgrid(frame.tools.tab, column = 0, row = 1)
-
-# box for plot settings
-frame.sort.tools.tab <- tkframe(notebook.main.tools.tab, relief = 'ridge', 
+frame.tools1 <- tkframe(notebook.main.tools1.tab, relief = 'ridge', 
+                        borderwidth = 5)
+# box for sort tool
+frame.sort.tools.tab <- tkframe(frame.tools1, relief = 'ridge', 
                                 borderwidth = 5)
 
 tkgrid(tklabel(frame.sort.tools.tab, text = "Sort tools"), columnspan = 2) 
@@ -1557,13 +1532,13 @@ tkgrid(tklistbox(frame.sort.tools.tab, listvariable = tclVar(""),
 combobox.top.bottom <- tk2combobox(frame.sort.tools.tab, 
                                    values =  kTopBottomOptions, 
                                    textvariable = tcl.start.top.bottom.option,
-                             state = "readonly", width = 10) 
+                                   state = "readonly", width = 10) 
 tkgrid(combobox.top.bottom, sticky = "w", column = 0, row = 2, padx = c(5, 0)) 
 
 combobox.top.bottom.num <- tk2combobox(frame.sort.tools.tab, 
                                        values =  kTopBottomNum, 
-                                 textvariable = tcl.start.top.bottom.num, 
-                                 state = "readonly", width = 3) 
+                                       textvariable = tcl.start.top.bottom.num, 
+                                       state = "readonly", width = 3) 
 tkgrid(combobox.top.bottom.num, sticky = "we", column = 1, row = 2, 
        padx = c(0, 5), pady = c(10, 10))
 
@@ -1573,6 +1548,69 @@ tkgrid(tkbutton(frame.sort.tools.tab, text = "   Sort   ",
 
 tkgrid(frame.sort.tools.tab, column = 0, row = 0, sticky = 'n')
 
+frame.intersect.tools.tab <- tkframe(frame.tools1, relief = 'ridge', 
+                                borderwidth = 5)
+
+tkgrid(tklistbox(frame.intersect.tools.tab, listvariable = tclVar("list:"), 
+                 height = 1, width = 4, relief = 'flat'))
+combobox.gene.compare <- tk2combobox(frame.intersect.tools.tab, 
+                                  textvariable = tcl.start.file.compare.names,
+                                  state = "readonly") 
+tkgrid(combobox.gene.compare, sticky = "w", column = 1, row = 0)
+
+tkgrid(tklistbox(frame.intersect.tools.tab, 
+                 listvariable = tclVar("compare_to:"), 
+                 height = 1, width = 12, 
+                 relief = 'flat'), column = 0, row = 3)
+combobox.gene.compare2 <- tk2combobox(frame.intersect.tools.tab, 
+                                  textvariable = tcl.start.file.compare.names,
+                                  state="readonly") 
+tkgrid(combobox.gene.compare2, sticky = "w", column = 1, row = 3) 
+
+tkgrid(tkbutton(frame.intersect.tools.tab, text = " intersect list ", 
+                command =  function() OnOk()), 
+       column = 0, row = 4, columnspan =2)
+
+tkgrid(tkbutton(frame.intersect.tools.tab, text = " save list ", 
+                command =  function() OnOk()), 
+       column = 0, row = 5, columnspan = 2)
+
+tkgrid(frame.intersect.tools.tab)
+
+tkgrid(frame.tools1)
+
+# tools2 main tab ----
+notebook.main.tools2.tab <- tk2notetab(notebook.main, "Tools2")
+
+frame.tools2 <- tkframe(notebook.main.tools2.tab, relief = 'ridge', 
+                        borderwidth = 5)
+
+tkgrid(frame.tools2)
+
+# tab for display genes ----
+notebook.main.genes.tab <- tk2notetab(notebook.main, "Show Genes")
+
+frame.genes.tab <- tkframe(notebook.main.genes.tab, relief = 'ridge', 
+                           borderwidth = 5)
+
+tkgrid(tkbutton(frame.genes.tab, text = " Show Genes ", 
+                command =  function() ShowGenes()), 
+       column = 0, row = 1, columnspan = 2)
+
+
+frame.show.genes <- tkframe(notebook.main.genes.tab, relief = 'ridge', 
+                            borderwidth = 5)
+tkgrid(frame.show.genes, column = 0, row = 1, sticky = "n")
+
+listbox.title.show.genes <- tklistbox(frame.show.genes, 
+                                      listvariable = tclVar("load_list"), 
+                                      relief = 'flat', height = 1, width = 30)
+tkgrid(listbox.title.show.genes, column = 0, row = 0)
+
+listbox.show.genes <- tk2listbox(frame.show.genes, height = 20, width = 30)
+tkgrid(listbox.show.genes, column = 0, row = 1, sticky = "n")
+
+tkgrid(frame.genes.tab, column = 0, row = 0, sticky = "n")
 
 
 # end ----
