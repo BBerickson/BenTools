@@ -1,4 +1,4 @@
-# Created by Benjamin Erickson
+# Created by Benjamin Erickson  
 version.num <- 'Ben Tools tabs'
 # For plotting Bentley lab table files and generating gene list
 
@@ -312,7 +312,8 @@ LoadTableFile <- function() {
         list.genefile$common <<- unique(tablefile[ ,1])
       }
       file.count <- file.count + 1
-      color.safe <- file.count %% length(kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
+      color.safe <- file.count %% 
+        length(kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
       if (color.safe == 0) {
         color.safe <- 1
       }
@@ -351,7 +352,7 @@ LoadTableFile <- function() {
                 values = sapply(list.genefile.info$common, "[[", 1))
     tkconfigure(combobox.denominator, 
                 values = sapply(list.genefile.info$common, "[[", 1))
-    tkset(combobox.file, last(sapply(list.genefile.info$common, "[[", 1)))
+    tkset(combobox.file, file.name)
     tkconfigure(label.common.length, 
                 text = paste("n = ", length(list.genefile$common)))
     ComboboxsUpdate()
@@ -386,20 +387,35 @@ LoadGeneFile <- function(on.listbox, off.listbox, label.file, label.count) {
         tcl("wm", "attributes", root, topmost = TRUE)
         return ()
       }
+      old.file.name <- ComboboxSelectionHelper()
+      if (old.file.name != "list of table files") {
+        list.genefile[old.file.name] <<- NULL
+        list.genefile.info[old.file.name] <<- NULL
+      }
       genefile <- read.table(full.file.name, stringsAsFactors = FALSE,
                                header = FALSE)
       legend.name <- strsplit(as.character(file.name), '.txt')[[1]][1]
       legend.nickname <- strsplit(unlist(legend.name), '[!]')[[1]]
       legend.nickname <- legend.nickname[floor(mean(
         seq_along(legend.nickname)))]
-      list.genefile[legend.name] <<- list(unique(genefile[ , 1]))
-      genelist.count <- length(list.genefile[[legend.name]])
-      # TODO fix
-      enesg <- data.frame(gene = list.genefile[[legend.name]], 
+      enesg <- data.frame(gene = unique(genefile[ , 1]), 
                           stringsAsFactors = FALSE)
       enesg2 <- data.frame(gene = list.genefile$common, 
-                          stringsAsFactors = FALSE)
+                           stringsAsFactors = FALSE)
       genelist.count2 <- length(unlist(inner_join(enesg, enesg2, by = "gene")))
+      if (genelist.count2 == 0) {
+        tkmessageBox(message = "No genes in common with loaded files")
+        control.state[3] <<- 0
+        tcl("wm", "attributes", root, topmost = TRUE)
+        tkconfigure(label.file, text = "list of table files")
+        tkconfigure(label.count, text = "n = 0")
+        tkdelete(on.listbox, 0, 'end')
+        tkdelete(off.listbox, 0, 'end')
+        
+        return (ComboboxsUpdate())
+      }
+      list.genefile[legend.name] <<- list(unique(genefile[ , 1]))
+      genelist.count <- length(list.genefile[[legend.name]])
       list.genefile.info[legend.name] <<- list(lapply(
         list.genefile.info$common, function(i) c(i[[1]], paste(i[[2]], 
                             legend.nickname , sep = "-"), 
