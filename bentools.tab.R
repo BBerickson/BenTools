@@ -97,7 +97,7 @@ kListColorSet <- list("color.set1" = c("#a6cee3", "#1f78b4", "#b2df8a",
                                        "blue", "green", rep("black",10)))
 kMathOptions <- c("mean", "sum", "median")
 kTopBottomOptions <- c("Top%", "Bottom%") #_TODO change to inclusive exclusive 
-kTopBottomNum <- c(100, 75, 50, 25, 10, 5)
+kTopBottomNum <- c(1, seq(5,100, by = 5))
 # plot lines and ticks with labels
 list.plot.lines <- list("543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
                         "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5))
@@ -117,7 +117,7 @@ tcl.start.color.set <- tclVar(names(kListColorSet)[1])
 tcl.start.line.option <- tclVar(kLineOptions[1])
 tcl.start.dot.option <- tclVar(kDotOptions[1])
 tcl.start.top.bottom.option <- tclVar(kTopBottomOptions[1])
-tcl.start.top.bottom.num <- tclVar(kTopBottomNum[5])
+tcl.start.top.bottom.num <- tclVar(kTopBottomNum[6])
 tcl.start.color <- tclVar(kListColorSet[[1]][1])
 tcl.start.math.option <- tclVar(kMathOptions[1])
 tcl.start.norm.bin <- tclVar(0)
@@ -1552,55 +1552,8 @@ notebook.main.tools1.tab <- tk2notetab(notebook.main, "Tools1")
 
 frame.tools1 <- tkframe(notebook.main.tools1.tab, relief = 'ridge', 
                         borderwidth = 5)
-# box for sort tool
-frame.sort.tools.tab <- tkframe(frame.tools1, relief = 'ridge', 
-                                borderwidth = 5)
 
-tkgrid(tklabel(frame.sort.tools.tab, text = "Sort tools"), columnspan = 2) 
 
-combobox.top.bottom <- tk2combobox(frame.sort.tools.tab, 
-                                   values =  kTopBottomOptions, 
-                                   textvariable = tcl.start.top.bottom.option,
-                                   state = "readonly", width = 10) 
-tkgrid(combobox.top.bottom, sticky = "w", column = 0, row = 2, padx = c(5, 0)) 
-
-combobox.top.bottom.num <- tk2combobox(frame.sort.tools.tab, 
-                                       values =  kTopBottomNum, 
-                                       textvariable = tcl.start.top.bottom.num, 
-                                       state = "readonly", width = 3) 
-tkgrid(combobox.top.bottom.num, sticky = "we", column = 1, row = 2, 
-       padx = c(0, 5), pady = c(10, 10))
-
-tkgrid(tkbutton(frame.sort.tools.tab, text = "   Sort   ", 
-                command =  function() OnOk()), 
-       column = 0, row = 4, columnspan = 3, pady = c(10, 10))
-
-tkgrid(frame.sort.tools.tab, column = 0, row = 0, sticky = 'n')
-
-frame.intersect.tools.tab <- tkframe(frame.tools1, relief = 'ridge', 
-                                borderwidth = 5)
-
-tkgrid(tklistbox(frame.intersect.tools.tab, listvariable = tclVar("list:"), 
-                 height = 1, width = 4, relief = 'flat'))
-combobox.gene.compare <- tk2combobox(frame.intersect.tools.tab, 
-                                  textvariable = tcl.start.file.compare.names,
-                                  state = "readonly") 
-tkgrid(combobox.gene.compare, sticky = "w", column = 1, row = 0)
-
-tkgrid(tklistbox(frame.intersect.tools.tab, 
-                 listvariable = tclVar("compare_to:"), 
-                 height = 1, width = 12, 
-                 relief = 'flat'), column = 0, row = 3)
-combobox.gene.compare2 <- tk2combobox(frame.intersect.tools.tab, 
-                                  textvariable = tcl.start.file.compare.names,
-                                  state="readonly") 
-tkgrid(combobox.gene.compare2, sticky = "w", column = 1, row = 3) 
-
-tkgrid(tkbutton(frame.intersect.tools.tab, text = " intersect list ", 
-                command =  function() OnOk()), 
-       column = 0, row = 4, columnspan =2)
-
-tkgrid(frame.intersect.tools.tab)
 
 notebook.on.off.tools1 <- tk2notebook(frame.tools1, tabs = c("Sort tools list", 
                                                       "Intersect list"))
@@ -1611,6 +1564,51 @@ notebook.on.off.sort.tab <- tk2notetab(notebook.on.off.tools1,
 # TODO fix function
 # tkbind(notebook.on.off.common.tab, "<Visibility>", ComboboxsGeneSet2)
 
+# box for sort tool
+frame.sort.tools.tab <- tkframe(notebook.on.off.sort.tab, relief = 'ridge', 
+                                borderwidth = 5)
+
+tkgrid(tklabel(frame.sort.tools.tab, text = "Sort tools"), columnspan = 2) 
+
+combobox.top.bottom <- tk2combobox(frame.sort.tools.tab, 
+                                   values =  kTopBottomOptions, 
+                                   textvariable = tcl.start.top.bottom.option,
+                                   state = "readonly", width = 8) 
+tkgrid(combobox.top.bottom, sticky = "w", columnspan = 2, column = 0, row = 1, padx = c(5, 0)) 
+
+combobox.top.bottom.num <- tk2combobox(frame.sort.tools.tab, 
+                                       values =  kTopBottomNum, 
+                                       textvariable = tcl.start.top.bottom.num, 
+                                       state = "readonly", width = 3) 
+tkgrid(combobox.top.bottom.num, sticky = "we", columnspan = 2, column = 2, row = 1, 
+       padx = c(0, 5), pady = c(10, 10))
+combobox.gene.sort <- tk2combobox(frame.sort.tools.tab, 
+                                  textvariable = tcl.start.file.compare.names,
+                                  state = "readonly") 
+tkgrid(combobox.gene.sort, columnspan = 4, column = 0, row = 2)
+
+tkgrid(tklistbox(frame.sort.tools.tab, listvariable = tclVar("bins"), 
+                 height = 1, width = 4, relief = 'flat'), padx = c(5, 0), 
+       column = 0, row = 3, sticky ="e")
+combobox.bin.start <- tk2combobox(frame.sort.tools.tab, 
+                                     textvariable = tcl.start.norm.bin,
+                                     state = "readonly", width = 3) 
+tkgrid(combobox.bin.start, padx = c(0, 0), column = 1, row = 3, sticky ="w")
+tkgrid(tklistbox(frame.sort.tools.tab, listvariable = tclVar("to"), 
+                 height = 1, width = 2, relief = 'flat'), column = 2, row = 3, 
+       padx = c(0, 0), sticky ="w")
+combobox.bin.end <- tk2combobox(frame.sort.tools.tab, 
+                                  textvariable = tcl.start.norm.bin,
+                                  state = "readonly", width = 3) 
+tkgrid(combobox.bin.end, column = 3, row = 3, padx = c(0, 10), sticky ="w")
+
+tkgrid(tkbutton(frame.sort.tools.tab, text = "   Sort   ", 
+                command =  function() OnOk()), 
+       column = 0, row = 4, columnspan = 4, pady = c(10, 10))
+
+tkgrid(frame.sort.tools.tab, column = 0, row = 0, sticky = 'n')
+
+# on off tab for sort
 frame.sort.tab <- tkframe(notebook.on.off.sort.tab)
 
 label.sort.file <- tklabel(frame.sort.tab, text = "list of table files")
@@ -1639,8 +1637,35 @@ tkgrid(tkbutton(frame.sort.tab, text = " Save gene list ",
 
 tkgrid(frame.sort.tab)
 
+# on off tab for intersect tool
 notebook.on.off.intersect.tab <- tk2notetab(notebook.on.off.tools1, "Intersect list")
 # tkbind(notebook.on.off.intersect.tab, "<Visibility>", ComboboxsGeneSet2)
+
+#frame for intersect tools 
+frame.intersect.tools.tab <- tkframe(notebook.on.off.intersect.tab, relief = 'ridge', 
+                                     borderwidth = 5)
+
+tkgrid(tklistbox(frame.intersect.tools.tab, listvariable = tclVar("list:"), 
+                 height = 1, width = 4, relief = 'flat'))
+combobox.gene.compare <- tk2combobox(frame.intersect.tools.tab, 
+                                     textvariable = tcl.start.file.compare.names,
+                                     state = "readonly") 
+tkgrid(combobox.gene.compare, sticky = "w", column = 1, row = 0)
+
+tkgrid(tklistbox(frame.intersect.tools.tab, 
+                 listvariable = tclVar("compare_to:"), 
+                 height = 1, width = 12, 
+                 relief = 'flat'), column = 0, row = 3)
+combobox.gene.compare2 <- tk2combobox(frame.intersect.tools.tab, 
+                                      textvariable = tcl.start.file.compare.names,
+                                      state="readonly") 
+tkgrid(combobox.gene.compare2, sticky = "w", column = 1, row = 3) 
+
+tkgrid(tkbutton(frame.intersect.tools.tab, text = " intersect list ", 
+                command =  function() OnOk()), 
+       column = 0, row = 4, columnspan =2)
+
+tkgrid(frame.intersect.tools.tab)
 
 frame.intersect.tab <- tkframe(notebook.on.off.intersect.tab)
 
