@@ -246,17 +246,27 @@ ComboboxSelectionHelper <- function() {
   }
   return (file.name)
 }
-
+# TODO finish setting up for other bin checks ... pass comboboxes
 # helper for keeping start and end bins in check
-BinStartEndHelper <- function(tcl.start.bin.start, tcl.start.bin.end, 
+BinStartEndHelper <- function(start.bin, end.bin, 
                               num) {
-  start <- as.numeric(tclvalue(tcl.start.bin.start))
-  end <- as.numeric(tclvalue(tcl.start.bin.end))
+  start <- as.numeric(tclvalue(start.bin))
+  end <- as.numeric(tclvalue(end.bin))
   if (num == 1 && start > end) {
     tkset(combobox.bin.end, start)
   } else if (num == 2 && start > end) {
     tkset(combobox.bin.start, end)
   }
+}
+
+# helper for ploting selected gene list
+SelectGeneListPlotHelper <- function(){
+  num <- as.integer(tkcurselection(listbox.show.genes))
+  sel.list <- NULL
+  for(i in num){
+    sel.list <- c(sel.list, tclvalue(tkget(listbox.show.genes,(i))))
+  }
+  MakeDataFrame(sel.list)
 }
 
 # read in /remove files functions ----
@@ -616,24 +626,20 @@ MakeNormFile <- function() {
 # displays the selected gene lists genes
 ShowGenes <- function() {
   if(control.state[3] == 1 || is.null(names(list.data$table.file))) {
-    return ()
+    return()
   } else {    
-    combo.name.gene.file <- as.character(
-      tclvalue(tkget(combobox.gene.compare)))
-    # TODO do I need this and/orto fix this?
-    if (combo.name.gene.file != tclvalue(tcl.start.file.compare.names1)) { 
-      # TODO add something like tkconfigure(listbox.show.genes, 
-        # listvariable = tclVar(as.character(
-        # list.data$gene.file[[combo.name.gene.file]]$common)))
-      return ()     
-    } else {
-      tkdelete(listbox.title.show.genes, 0, 'end')
-      tkdelete(listbox.show.genes, 0 ,'end')
-      tkconfigure(listbox.show.genes, 
-              listvariable = tclVar(as.character(list.data$gene.file$common)))
+    file.name <- ComboboxSelectionHelper()
+    if (file.name == "list of table files"|| 
+        !file.name %in% names(list.data$gene.info)) {
+      tkmessageBox(message = "No genes in this list")
+      return()
+    } 
+    tkdelete(listbox.title.show.genes, 0, 'end')
+    tkdelete(listbox.show.genes, 0 ,'end')
+    tkconfigure(listbox.show.genes, 
+              listvariable = tclVar(list.data$gene.file[[file.name]]))
       tkinsert(listbox.title.show.genes, 0, 
-              paste('common genes,  n = ', length(list.data$gene.file$common)))
-    }
+              paste(file.name, ' genes,  n = ', length(list.data$gene.file[[file.name]])))
   }
 }
 
@@ -740,7 +746,7 @@ IntersectGeneLists <- function() {
 # plotting functions ----
 
 # Makes data frame and gathers plot settings for plotting active samples
-MakeDataFrame <- function() {
+MakeDataFrame <- function(sel.list = NULL) {
   if (control.state[3] == 1 || is.null(names(list.data$table.file))) {
     return ()
   } else {
@@ -756,10 +762,19 @@ MakeDataFrame <- function() {
       if (sum(as.numeric(sapply(list.data$gene.info[[i]], "[[", 6))) == 0) { 
         next
       } else {
-        use.x.label <- paste(use.x.label, paste(i, "n = ", 
-                          length(list.data$gene.file[[i]])), sep = '\n') 
         enesg <- data.frame(gene = list.data$gene.file[[i]], 
                             stringsAsFactors = FALSE)
+        if (!is.null(sel.list)) {
+          enesg2 <- c(enesg$gene, sel.list)
+          enesg <- data.frame(gene = enesg2[duplicated(enesg2)], 
+                              stringsAsFactors = FALSE)
+          use.x.label <- paste(use.x.label, paste("select ", i, "n = ", 
+                                                  length(enesg[[1]])), sep = '\n') 
+          
+        } else {
+          use.x.label <- paste(use.x.label, paste(i, "n = ", 
+                                                length(enesg[[1]])), sep = '\n') 
+        }
         lapply(names(list.data$table.file), function(k) 
           # uses only acive lists  
           if (as.numeric(list.data$gene.info[[i]][[k]][6]) == 1) {
@@ -1365,7 +1380,7 @@ frame.plot.button <- tkframe(frame.common.items, relief = 'ridge',
                              borderwidth = 5)
 tkgrid(frame.plot.button, column = 0, row = 2)
 
-tkgrid(tkbutton(frame.plot.button, font =c('bold', 23), 
+tkgrid(tkbutton(frame.plot.button, font = c('bold', 23), 
                 text = '      Plot       ', 
                 command = function() MakeDataFrame())) 
 tkgrid(frame.common.items, column = 0, row = 0)
@@ -1732,7 +1747,7 @@ notebook.main.genes.tab <- tk2notetab(notebook.main, "Show Genes")
 frame.genes.tab <- tkframe(notebook.main.genes.tab, relief = 'ridge', 
                            borderwidth = 5)
 
-tkgrid(tkbutton(frame.genes.tab, text = " Show Genes ", 
+tkgrid(tkbutton(frame.genes.tab, text = " Show Genes ", font = c("bold", 15), 
                 command =  function() ShowGenes()), 
        column = 0, row = 1, columnspan = 2)
 
@@ -1749,6 +1764,9 @@ tkgrid(listbox.title.show.genes, column = 0, row = 0)
 listbox.show.genes <- tk2listbox(frame.show.genes, height = 20, width = 30)
 tkgrid(listbox.show.genes, column = 0, row = 1, sticky = "n")
 
+tkgrid(tkbutton(frame.show.genes, text = " Plot select ", font = c("bold", 15), 
+                command =  function() SelectGeneListPlotHelper()), 
+       column = 0, row = 3, columnspan = 2, sticky = "ew")
 tkgrid(frame.genes.tab, column = 0, row = 0, sticky = "n")
 
 # end ----
