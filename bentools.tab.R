@@ -246,16 +246,16 @@ ComboboxSelectionHelper <- function() {
   }
   return (file.name)
 }
-# TODO finish setting up for other bin checks ... pass comboboxes
+
 # helper for keeping start and end bins in check
-BinStartEndHelper <- function(start.bin, end.bin, 
+BinStartEndHelper <- function(start.bin, end.bin, combo.start, combo.end, 
                               num) {
   start <- as.numeric(tclvalue(start.bin))
   end <- as.numeric(tclvalue(end.bin))
   if (num == 1 && start > end) {
-    tkset(combobox.bin.end, start)
+    tkset(combo.end, start)
   } else if (num == 2 && start > end) {
-    tkset(combobox.bin.start, end)
+    tkset(combo.start, end)
   }
 }
 
@@ -1628,7 +1628,8 @@ combobox.bin.start <- tk2combobox(frame.sort.tools.tab,
                                      state = "readonly", width = 3) 
 tkgrid(combobox.bin.start, padx = c(0, 0), column = 1, row = 3, sticky ="w")
 tkbind(combobox.bin.start, "<<ComboboxSelected>>", function()
-       BinStartEndHelper(tcl.start.bin.start, tcl.start.bin.end, 1))
+       BinStartEndHelper(tcl.start.bin.start, tcl.start.bin.end, 
+                         combobox.bin.start, combobox.bin.end, 1))
 tkgrid(tklistbox(frame.sort.tools.tab, listvariable = tclVar("to"), 
                  height = 1, width = 2, relief = 'flat'), column = 2, row = 3, 
        padx = c(0, 0), sticky ="w")
@@ -1637,7 +1638,8 @@ combobox.bin.end <- tk2combobox(frame.sort.tools.tab,
                                   state = "readonly", width = 3) 
 tkgrid(combobox.bin.end, column = 3, row = 3, padx = c(0, 10), sticky ="w")
 tkbind(combobox.bin.end, "<<ComboboxSelected>>", function()
-       BinStartEndHelper(tcl.start.bin.start, tcl.start.bin.end, 2))
+       BinStartEndHelper(tcl.start.bin.start, tcl.start.bin.end, 
+                         combobox.bin.start, combobox.bin.end, 2))
 
 tkgrid(tkbutton(frame.sort.tools.tab, text = "   Sort   ", 
                 command =  function() SortTop(listbox.sort.on, 
