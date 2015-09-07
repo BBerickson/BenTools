@@ -108,8 +108,8 @@ tss.tts.options <- c('TSS', 'PolyA', '500', '500')
 # tcl starting values ----
 tcl.start.tablefile <- tclVar("Load File")
 tcl.start.file.control.tab.names <- tclVar(kNbFileControlTabNames[1])
-tcl.start.file.compare.names1 <- tclVar(kNbFileControlTabNames[1])
-tcl.start.file.compare.names2 <- tclVar(kNbFileControlTabNames[1])
+tcl.start.file.compare.names1 <- tclVar("Load File")
+tcl.start.file.compare.names2 <- tclVar("Load File")
 tcl.start.color.set <- tclVar(names(kListColorSet)[1])
 tcl.start.line.option <- tclVar(kLineOptions[1])
 tcl.start.dot.option <- tclVar(kDotOptions[1])
@@ -252,9 +252,9 @@ BinStartEndHelper <- function(tcl.start.bin.start, tcl.start.bin.end,
                               num) {
   start <- as.numeric(tclvalue(tcl.start.bin.start))
   end <- as.numeric(tclvalue(tcl.start.bin.end))
-  if (num == 1 & start > end) {
+  if (num == 1 && start > end) {
     tkset(combobox.bin.end, start)
-  } else if (num == 2 & start > end) {
+  } else if (num == 2 && start > end) {
     tkset(combobox.bin.start, end)
   }
 }
@@ -331,6 +331,8 @@ LoadTableFile <- function() {
         list.data$gene.file$common <<- unique(tablefile[ ,1])
         tkconfigure(combobox.bin.start, values = c(1:(num.bins[2] - 1)))
         tkconfigure(combobox.bin.end, values = c(1:(num.bins[2] - 1)))
+        tkset(combobox.compare1, "Need_2_gene_sets")
+        tkset(combobox.compare2, "Need_2_gene_sets")
         tkset(combobox.bin.end, num.bins[2] - 1)
       }
       file.count <- file.count + 1
@@ -364,7 +366,6 @@ LoadTableFile <- function() {
       })
       
       list.data$table.file[file.name] <<- list(tablefile)
-      tkinsert(listbox.common.on, 'end', file.name)
     }
     tcl("wm", "attributes", root, topmost = TRUE)
     control.state[3] <<- 0  
@@ -375,9 +376,8 @@ LoadTableFile <- function() {
     tkconfigure(combobox.denominator, 
                 values = sapply(list.data$gene.info$common, "[[", 1))
     tkset(combobox.file, file.name)
-    tkconfigure(label.common.length, 
-                text = paste("n = ", length(list.data$gene.file$common)))
     ComboboxsUpdate()
+    UpdateEntrys("common")
     close(pb)
   }
 }
@@ -433,7 +433,10 @@ LoadGeneFile <- function(on.listbox, off.listbox, label.file, label.count) {
         tkconfigure(label.count, text = "n = 0")
         tkdelete(on.listbox, 0, 'end')
         tkdelete(off.listbox, 0, 'end')
-        
+        tkconfigure(combobox.compare1, values = names(list.data$gene.file))
+        tkconfigure(combobox.compare2, values = names(list.data$gene.file))
+        tkset(combobox.compare1, "Pick_file_1")
+        tkset(combobox.compare2, "Pick_file_2")
         return (ComboboxsUpdate())
       }
       list.data$gene.file[legend.name] <<- list(unique(genefile[ , 1]))
@@ -446,9 +449,14 @@ LoadGeneFile <- function(on.listbox, off.listbox, label.file, label.count) {
                             paste("genes in common n = ", genelist.count2),
                             i[9])))
       tkconfigure(label.file, text = legend.name)
-      tkconfigure(label.count, text = paste("genes in common n = ", 
-                                            genelist.count2))
-      MoveAllToOtherEntry(on.listbox, off.listbox, "on")
+      tkconfigure(combobox.compare1, values = names(list.data$gene.file))
+      tkconfigure(combobox.compare2, values = names(list.data$gene.file))
+      tkset(combobox.compare1, "Pick_file_1")
+      tkset(combobox.compare2, "Pick_file_2")
+      tab <- paste(strsplit(tk2notetab.text(notebook.on.off), 
+                            "\n")[[1]], collapse = " ")
+      tmp <- strsplit(tab, " " )[[1]][3]
+      UpdateEntrys(paste("gene", tmp, sep = ""))
       }
     tcl("wm", "attributes", root, topmost = TRUE)
     control.state[3] <<- 0
@@ -458,7 +466,7 @@ LoadGeneFile <- function(on.listbox, off.listbox, label.file, label.count) {
 
 #removes file
 RemoveFile <- function() {
-  if (control.state[3] == 0 & length(names(list.data$table.file)) > 0) {
+  if (control.state[3] == 0 && length(names(list.data$table.file)) > 0) {
     for (i in as.integer(tkcurselection(listbox.common.on))) {
       filename <- tclvalue(tkget(listbox.common.on, i))
       list.data$table.file[[filename]] <<- NULL
@@ -552,7 +560,7 @@ GetColor <- function() {
 MakeNormFile <- function() {
   nom <- as.character(tclvalue(tkget(combobox.numerator)))
   dnom <- as.character(tclvalue(tkget(combobox.denominator)))
-  if (nom != "numerator" & dnom != "denominator") {  
+  if (nom != "numerator" && dnom != "denominator") {  
     new.gene.list <- data.frame(inner_join(list.data$table.file[[nom]], 
                                      list.data$table.file[[dnom]], by = "gene"), 
                           stringsAsFactors = FALSE)
@@ -607,7 +615,7 @@ MakeNormFile <- function() {
 
 # displays the selected gene lists genes
 ShowGenes <- function() {
-  if(control.state[3] == 1 | is.null(names(list.data$table.file))) {
+  if(control.state[3] == 1 || is.null(names(list.data$table.file))) {
     return ()
   } else {    
     combo.name.gene.file <- as.character(
@@ -630,7 +638,7 @@ ShowGenes <- function() {
 }
 
 # sorts active gene list contain top % signal based on selected bins and file
-SortTop <- function(on.listbox, off.listbox, label.file, label.count) { 
+SortTop <- function(on.listbox, off.listbox) { 
   if (control.state[3] == 0) {
     if (length(list.data$table.file) < 1) {
       return ()
@@ -672,7 +680,7 @@ SortTop <- function(on.listbox, off.listbox, label.file, label.count) {
     gene.count <- length(list.data$gene.file$sort)
     lapply(list.data$gene.info[[R.file.control]], function(i) 
       list.data$gene.info$sort[[i[[1]]]] <<- c(i[[1]], 
-                                              paste("sort", i[[2]], sep = "-"), 
+                                              paste(i[[2]], "sort", sep = "-"), 
                                                 i[[3]], i[[4]], i[[5]], i[[6]], 
                                                 paste(R.option, R.num , "from",
                                                       R.tablefile), 
@@ -680,30 +688,60 @@ SortTop <- function(on.listbox, off.listbox, label.file, label.count) {
                                                       gene.count),
                                                 i[9]))
     tkset(combobox.gene.set, kNbFileControlTabNames[6])
-    tkconfigure(label.file, text = paste(R.option, R.num , "from", R.tablefile))
-    tkconfigure(label.count, text = paste("genes in sort n = ", gene.count))
-    tkset(combobox.color, list.data$gene.info$sort[[R.tablefile]][5])
-    tkset(combobox.lines, list.data$gene.info$sort[[R.tablefile]][4])
-    tkset(combobox.dots, list.data$gene.info$sort[[R.tablefile]][3])
-    tkdelete(entry.nickname, 0, 'end')
-    tkinsert(entry.nickname,  0, list.data$gene.info$sort[[R.tablefile]][2])
-    tkconfigure(listbox.stats, listvariable = 
-                  tclVar(as.character(list.data$gene.info$sort[[R.tablefile]][7:8])))
-    tkset(combobox.color.sets, list.data$gene.info$sort[[R.tablefile]][9])
-    MoveAllToOtherEntry(on.listbox, off.listbox, "on")
+    UpdateEntrys("sort")
+    tkconfigure(combobox.compare1, values = names(list.data$gene.file))
+    tkconfigure(combobox.compare2, values = names(list.data$gene.file))
+    tkset(combobox.compare1, "Pick_file_1")
+    tkset(combobox.compare2, "Pick_file_2")
     close(pb)
     control.state[3] <<- 0
     tcl("wm", "attributes", root, topmost = TRUE)
-    return()
+    return(ComboboxsUpdate())
   }
   return()
 }	
+
+# intersect gene lists creating a new one
+IntersectGeneLists <- function() { 
+  compare1 <- tclvalue(tcl.start.file.compare.names1)
+  compare2 <- tclvalue(tcl.start.file.compare.names2)
+  if (compare1 != compare2 && control.state[3] != 1) {
+    gene.names <- c(unique(list.data$gene.file[[compare1]]),
+                       unique(list.data$gene.file[[compare2]]))
+    gene.names <- gene.names[duplicated(gene.names)]
+    if (length(gene.names) > 0) {
+      file.nickname <- paste(compare1, "intersect with", compare2, sep = " ")
+      list.data$gene.file$intersect <<- gene.names
+      gene.count <- length(gene.names)
+      lapply(list.data$gene.info[[compare1]], function(i) 
+        list.data$gene.info$intersect[[i[[1]]]] <<- c(i[[1]],
+                                                      paste(i[[2]], "intersect", sep = "-"), 
+                                                      i[[3]], i[[4]], i[[5]], i[[6]], 
+                                                      file.nickname, 
+                                                      paste("n = ", gene.count),
+                                                      i[9]))
+      tkset(combobox.gene.set, kNbFileControlTabNames[7])
+      tkconfigure(combobox.compare1, values = names(list.data$gene.file))
+      tkconfigure(combobox.compare2, values = names(list.data$gene.file))
+      tkset(combobox.compare1, "Pick_file_1")
+      tkset(combobox.compare2, "Pick_file_2")
+      UpdateEntrys("intersect")
+      return(ComboboxsUpdate())
+    } else {
+      tkmessageBox(message = "no genes in common")
+      return(ComboboxsUpdate())
+    }
+  }
+  tkmessageBox(message = "Can't compare to self")
+  return()
+}
+
 
 # plotting functions ----
 
 # Makes data frame and gathers plot settings for plotting active samples
 MakeDataFrame <- function() {
-  if (control.state[3] == 1 | is.null(names(list.data$table.file))) {
+  if (control.state[3] == 1 || is.null(names(list.data$table.file))) {
     return ()
   } else {
     ComboboxsUpdateVaribles()
@@ -776,7 +814,7 @@ ApplyMath <- function(list.wide.data.frame, use.col, use.dot, use.line,
     tcl.checkbox.relative.frequency))
   norm.bin <- as.numeric(tclvalue(tcl.start.norm.bin))
   
-  if (r.checkbox.relative.frequency == 1 & norm.bin == 0) {
+  if (r.checkbox.relative.frequency == 1 && norm.bin == 0) {
     use.y.label <- paste(strsplit(use.y.label, split = " ")[[1]][1], 
                          "bins : Relative Frequency")
     norm <- lapply(seq_along(list.wide.data.frame), 
@@ -896,10 +934,10 @@ GGplotF <- function(list.long.data.frame, use.col, use.dot, use.line,
 # updates comboboxs and lists 
 ComboboxsUpdate <- function() {
   file.name <- ComboboxSelectionHelper()
-  if (file.name == "list of table files"| !file.name %in% names(list.data$gene.info)) {
+  if (file.name == "list of table files"|| !file.name %in% names(list.data$gene.info)) {
     file.name <- "common"
   } 
-  if (!is.null(names(list.data$table.file)) & control.state[3] == 0) {
+  if (!is.null(names(list.data$table.file)) && control.state[3] == 0) {
     cfile <- tclvalue(tkget(combobox.file))
     tkset(combobox.color, list.data$gene.info[[file.name]][[cfile]][5])
     tkset(combobox.lines, list.data$gene.info[[file.name]][[cfile]][4])
@@ -916,7 +954,7 @@ ComboboxsUpdate <- function() {
 # change in combobox saves vaues and changes tab
 ComboboxsGeneSet <- function() {
   combo.name <- tclvalue(tkget(combobox.gene.set))
-  if (combo.name == "Sort tools list" | combo.name == "Intersect list") {
+  if (combo.name == "Sort tools list" || combo.name == "Intersect list") {
     tk2notetab.select(notebook.on.off.tools1, combo.name)
   } else {
     tmp <- strsplit(combo.name, " " )[[1]]
@@ -924,6 +962,7 @@ ComboboxsGeneSet <- function() {
                                 tmp[3], sep = ""), " NA"))
     tk2notetab.select(notebook.on.off, tmp2)
   }
+  ComboboxsUpdate()
 }
 
 # keeps genelist cbb and tabs in sync
@@ -952,12 +991,12 @@ ComboboxsGeneSet2 <- function(notebook) {
 # saves current seletion
 ComboboxsUpdateVaribles <- function() {
   file.name <- ComboboxSelectionHelper()
-  if (file.name == "list of table files" | !file.name %in% names(list.data$gene.info)) {
+  if (file.name == "list of table files" || !file.name %in% names(list.data$gene.info)) {
     return (ComboboxsUpdate())
   }
   
   cfile <- tclvalue(tkget(combobox.file))
-  if (!is.null(names(list.data$table.file)) & control.state[3] == 0) {
+  if (!is.null(names(list.data$table.file)) && control.state[3] == 0) {
     list.data$gene.info[[file.name]][[cfile]][5] <<- 
       tclvalue(tkget(combobox.color))
     list.data$gene.info[[file.name]][[cfile]][4] <<- 
@@ -999,13 +1038,11 @@ ComboboxsColorSets <- function() {
   })
   tkconfigure(combobox.color, 
               values = kListColorSet[[tclvalue(tkget(combobox.color.sets))]])
-  tkset(combobox.color, 
-        kListColorSet[[tclvalue(tkget(combobox.color.sets))]][1])
   ComboboxsUpdate()
 }
 
 
-# Change plot labels with lines
+# Change plot axis labels + lines 
 PlotLines <- function() {
   num <- tclvalue(tkget(combobox.plot.lines))
   tkdelete(entry.line.tick.pos.one, 0, 'end')
@@ -1589,9 +1626,7 @@ tkbind(combobox.bin.end, "<<ComboboxSelected>>", function()
 
 tkgrid(tkbutton(frame.sort.tools.tab, text = "   Sort   ", 
                 command =  function() SortTop(listbox.sort.on, 
-                                              listbox.sort.off, 
-                                              label.sort.file, 
-                                              label.sort.length)), 
+                                              listbox.sort.off)), 
        column = 0, row = 4, columnspan = 4, pady = c(10, 10))
 
 tkgrid(frame.sort.tools.tab, column = 0, row = 0, sticky = 'n')
@@ -1636,7 +1671,7 @@ frame.intersect.tools.tab <- tkframe(notebook.on.off.intersect.tab, relief = 'ri
 
 tkgrid(tklistbox(frame.intersect.tools.tab, listvariable = tclVar("list:"), 
                  height = 1, width = 4, relief = 'flat'))
-tkgrid(tk2combobox(frame.intersect.tools.tab,
+tkgrid(combobox.compare1 <- tk2combobox(frame.intersect.tools.tab,
                    textvariable = tcl.start.file.compare.names1,
                    state = "readonly") , sticky = "w", column = 1, row = 0)
 
@@ -1644,12 +1679,12 @@ tkgrid(tklistbox(frame.intersect.tools.tab,
                  listvariable = tclVar("compare_to:"), 
                  height = 1, width = 12, 
                  relief = 'flat'), column = 0, row = 3)
-tkgrid(tk2combobox(frame.intersect.tools.tab, 
+tkgrid(combobox.compare2 <- tk2combobox(frame.intersect.tools.tab, 
                    textvariable = tcl.start.file.compare.names2,
                    state="readonly"), sticky = "w", column = 1, row = 3) 
 
 tkgrid(tkbutton(frame.intersect.tools.tab, text = " intersect list ", 
-                command =  function() OnOk()), 
+                command =  function() IntersectGeneLists()), 
        column = 0, row = 4, columnspan =2)
 
 tkgrid(frame.intersect.tools.tab)
