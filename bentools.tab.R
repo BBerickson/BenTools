@@ -74,7 +74,7 @@ control.state <- c("color.set1", 0, 0, 0)
 
 kNbFileControlTabNames <- c("Common Genes", "Gene list 1", "Gene list 2",
                             "Gene list 3", "Gene list 4", "Sort tools list", 
-                            "Intersect list")
+                            "Intersect list", "Compare regions", "Compare ratios")
 kDotOptions <- c("circle", "triangle point up", "plus", "cross", "diamond",
                 "triangle point down", "square cross", "star", "diamond plus", 
                 "circle  plus", "triangles up and down","square  plus", 
@@ -92,8 +92,10 @@ kListColorSet <- list("color.set1" = c("#a6cee3", "#1f78b4", "#b2df8a",
                       "color.set2" = c("red", "orange", "purple", "yellow",
                                        "blue", "green", rep("black",10)))
 kMathOptions <- c("mean", "sum", "median")
-kTopBottomOptions <- c("Top%", "Bottom%") #_TODO change to inclusive exclusive 
-kTopBottomNum <- c(1, seq(5,100, by = 5))
+kTopBottomOptions <- c("Top%", "Bottom%") 
+kInOutOptions <- c("inclusive", "exclusive") 
+kTopBottomNum <- c(1, seq(5, 100, by = 5))
+kFoldList <- seq(1, 3, by = 0.1)
 # plot lines and ticks with labels
 list.plot.lines <- list("543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
                         "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5))
@@ -106,32 +108,38 @@ list.plot.ticks <- list("543 bins 20,20,40" =
 tss.tts.options <- c('TSS', 'PolyA', '500', '500')
 
 # tcl starting values ----
-tcl.start.tablefile <- tclVar("Load File")
-tcl.start.file.control.tab.names <- tclVar(kNbFileControlTabNames[1])
-tcl.start.file.compare.names1 <- tclVar("Load File")
-tcl.start.file.compare.names2 <- tclVar("Load File")
-tcl.start.color.set <- tclVar(names(kListColorSet)[1])
-tcl.start.line.option <- tclVar(kLineOptions[1])
-tcl.start.dot.option <- tclVar(kDotOptions[1])
-tcl.start.top.bottom.option <- tclVar(kTopBottomOptions[1])
-tcl.start.top.bottom.num <- tclVar(kTopBottomNum[6])
-tcl.start.color <- tclVar(kListColorSet[[1]][1])
-tcl.start.math.option <- tclVar(kMathOptions[1])
-tcl.start.norm.bin <- tclVar(0)
-tcl.start.bin.start <- tclVar(1)
-tcl.start.bin.end <- tclVar(1)
-tcl.start.plot.line.name <- tclVar(names(list.plot.lines)[1])
+tcl.tablefile <- tclVar("Load File")
+tcl.file.control.tab.names <- tclVar(kNbFileControlTabNames[1])
+tcl.file.compare.names1 <- tclVar("Load File")
+tcl.file.compare.names2 <- tclVar("Load File")
+tcl.file1.regions <- tclVar("Load File")
+tcl.file2.regions <- tclVar("Load File")
+tcl.color.set <- tclVar(names(kListColorSet)[1])
+tcl.line.option <- tclVar(kLineOptions[1])
+tcl.dot.option <- tclVar(kDotOptions[1])
+tcl.top.bottom.option <- tclVar(kTopBottomOptions[1])
+tcl.top.bottom.num <- tclVar(kTopBottomNum[6])
+tcl.in.out.option.regions <- tclVar(kInOutOptions[1])
+tcl.bin.fold.regions <- tclVar(kFoldList[11])
+tcl.color <- tclVar(kListColorSet[[1]][1])
+tcl.math.option <- tclVar(kMathOptions[1])
+tcl.norm.bin <- tclVar(0)
+tcl.bin.start <- tclVar(1)
+tcl.bin.end <- tclVar(1)
+tcl.bin.start.regions <- tclVar(1)
+tcl.bin.end.regions <- tclVar(1)
+tcl.plot.line.name <- tclVar(names(list.plot.lines)[1])
 tcl.header <- tclVar('')
 tcl.one.tss.tts.option <- tclVar(tss.tts.options[1])
 tcl.two.tss.tts.option <- tclVar(tss.tts.options[2])
 tcl.three.tss.tts.option <- tclVar(tss.tts.options[3])
 tcl.four.tss.tts.option <- tclVar(tss.tts.options[4])
-tcl.start.label.plot.ticks <- tclVar(list.plot.ticks[[1]][[1]])
-tcl.start.pos.one.line <- tclVar(list.plot.lines[[1]][1])
-tcl.start.pos.two.line <- tclVar(list.plot.lines[[1]][2])
-tcl.start.pos.three.line <- tclVar(list.plot.lines[[1]][3])
-tcl.start.pos.four.line <- tclVar(list.plot.lines[[1]][4])
-tcl.start.pos.plot.ticks <- tclVar(list.plot.ticks[[1]][[2]])
+tcl.label.plot.ticks <- tclVar(list.plot.ticks[[1]][[1]])
+tcl.pos.one.line <- tclVar(list.plot.lines[[1]][1])
+tcl.pos.two.line <- tclVar(list.plot.lines[[1]][2])
+tcl.pos.three.line <- tclVar(list.plot.lines[[1]][3])
+tcl.pos.four.line <- tclVar(list.plot.lines[[1]][4])
+tcl.pos.plot.ticks <- tclVar(list.plot.ticks[[1]][[2]])
 tcl.checkbox.relative.frequency <- tclVar(0)
 tcl.checkbox.log2 <- tclVar(0)
 
@@ -243,6 +251,10 @@ ComboboxSelectionHelper <- function() {
     file.name <- "sort"
   } else if ( num == 6) {
     file.name <- "intersect"
+  } else if (num == 7) {
+    file.name <- "regions"
+  } else if (num == 8) {
+    file.name <- "ratios"
   }
   return (file.name)
 }
@@ -343,6 +355,8 @@ LoadTableFile <- function() {
         tkconfigure(combobox.bin.end, values = c(1:(num.bins[2] - 1)))
         tkset(combobox.compare1, "Need_2_gene_sets")
         tkset(combobox.compare2, "Need_2_gene_sets")
+        tkset(combobox.regions.file1, "Need_2_files")
+        tkset(combobox.regions.file2, "Need_2_files")
         tkset(combobox.bin.end, num.bins[2] - 1)
       }
       file.count <- file.count + 1
@@ -385,7 +399,15 @@ LoadTableFile <- function() {
                 values = sapply(list.data$gene.info$common, "[[", 1))
     tkconfigure(combobox.denominator, 
                 values = sapply(list.data$gene.info$common, "[[", 1))
+    tkconfigure(combobox.denominator, 
+                values = sapply(list.data$gene.info$common, "[[", 1))
+    tkconfigure(combobox.regions.file1, 
+                values = sapply(list.data$gene.info$common, "[[", 1))
+    tkconfigure(combobox.regions.file2, 
+                values = sapply(list.data$gene.info$common, "[[", 1))
     tkset(combobox.file, file.name)
+    tkset(combobox.regions.file1, "file_1")
+    tkset(combobox.regions.file2, "file_2")
     ComboboxsUpdate()
     UpdateEntrys("common")
     close(pb)
@@ -568,8 +590,8 @@ GetColor <- function() {
 
 # make normalized file ... devide one by the other
 MakeNormFile <- function() {
-  nom <- as.character(tclvalue(tkget(combobox.numerator)))
-  dnom <- as.character(tclvalue(tkget(combobox.denominator)))
+  nom <- tclvalue(tkget(combobox.numerator))
+  dnom <- tclvalue(tkget(combobox.denominator))
   if (nom != "numerator" && dnom != "denominator") {  
     new.gene.list <- data.frame(inner_join(list.data$table.file[[nom]], 
                                      list.data$table.file[[dnom]], by = "gene"), 
@@ -654,12 +676,12 @@ SortTop <- function(on.listbox, off.listbox) {
     pb <<- tkProgressBar(title = "be patient!!",  
                          min = 0, max = 100, width = 300)
     setTkProgressBar(pb, 100, label =  "sorting genes")
-    R.start.bin <- as.integer(tclvalue(tcl.start.bin.start))
-    R.end.bin <- as.integer(tclvalue(tcl.start.bin.end))
-    R.num <- as.integer(tclvalue(tcl.start.top.bottom.num))
+    R.start.bin <- as.integer(tclvalue(tcl.bin.start))
+    R.end.bin <- as.integer(tclvalue(tcl.bin.end))
+    R.num <- as.integer(tclvalue(tcl.top.bottom.num))
     R.file.control <- ComboboxSelectionHelper()
-    R.tablefile <- tclvalue(tcl.start.tablefile)
-    R.option <- tclvalue(tcl.start.top.bottom.option)
+    R.tablefile <- tclvalue(tcl.tablefile)
+    R.option <- tclvalue(tcl.top.bottom.option)
     enesg <- data.frame(gene = 
             list.data$gene.file[[R.file.control]],
             stringsAsFactors = FALSE)
@@ -707,10 +729,86 @@ SortTop <- function(on.listbox, off.listbox) {
   return()
 }	
 
+# a[1]/a[2] make gene list
+CompareRegions <- function(on.listbox, off.listbox) { 
+  R.tablefile1 <- tclvalue(tcl.file1.regions)
+  R.tablefile2 <- tclvalue(tcl.file2.regions)
+  if (control.state[3] == 0 && length(list.data$table.file) > 0 && 
+      R.tablefile1 != R.tablefile2)
+    
+    control.state[3] <<- 1
+    tcl("wm", "attributes", root, topmost = FALSE)
+    pb <<- tkProgressBar(title = "be patient!!",  
+                         min = 0, max = 100, width = 300)
+    setTkProgressBar(pb, 100, label =  "Comparing genes")
+    R.start.bin <- as.integer(tclvalue(tcl.bin.start.regions))
+    R.end.bin <- as.integer(tclvalue(tcl.bin.end.regions))
+    R.num <- as.integer(tclvalue(tcl.bin.fold.regions))
+    R.option <- tclvalue(tcl.in.out.option.regions)
+    enesg <- data.frame(gene = 
+                          list.data$gene.file$common,
+                        stringsAsFactors = FALSE)
+    new.gene.list <- data.frame(inner_join(list.data$table.file[[R.tablefile1]], 
+                                           list.data$table.file[[R.tablefile2]], 
+                                           by = "gene"), 
+                                stringsAsFactors = FALSE)
+    new.gene.list[is.na(new.gene.list)] <- 0  # replace NAs with 0
+    len <- (dim(new.gene.list)[2] - 1) / 2  # find number of bins
+    # find min value /2 to replace 0s 
+    new.min.for.na <- min(new.gene.list[, -1][new.gene.list[ , -1] > 0]) / 2
+    
+    new.tablefile <- data.frame(gene = new.gene.list[ ,1], 
+                   rowSums(new.gene.list[ ,2:(len + 1)][R.start.bin:R.end.bin], 
+                           na.rm = T), 
+                   rowSums(new.gene.list[ ,(len + 2):((len * 2) + 
+                                                    1)][R.start.bin:R.end.bin], 
+                           na.rm = T), 
+                                stringsAsFactors = FALSE)
+    # replace 0's with min/2
+    new.tablefile[ , -1] <- 
+      as.data.frame(lapply(new.tablefile[ , -1], 
+                           function(x) {replace(x, x == 0, new.min.for.na)}), 
+                    stringsAsFactors = FALSE)
+    my.data.frame <- data.frame(inner_join(new.tablefile, enesg, 
+                                           by = "gene"), 
+                                stringsAsFactors = FALSE)
+    my.data.frame[ , 4] <- my.data.frame[ , 2] / my.data.frame[ , 3]
+    
+    ix <- sort(my.data.frame[ , 4], decreasing=T, index=T)$ix
+    
+    gene.count <- nrow(my.data.frame)
+    if(R.option == kInOutOptions[1]) {
+      test1 <- my.data.frame[ , 4][ix] > R.num
+    } else {
+      test1 <- my.data.frame[ , 4][ix] < R.num
+    }
+    list.data$gene.file$regions <<- my.data.frame$gene[ix][test1]
+    gene.count <- length(list.data$gene.file$regions)
+    lapply(list.data$gene.info$common, function(i) 
+      list.data$gene.info$regions[[i[[1]]]] <<- c(i[[1]], 
+                                               paste(i[[2]], "regions", sep = "-"), 
+                                               i[[3]], i[[4]], i[[5]], i[[6]], 
+                                               paste(R.option, R.num , "fold",
+                                                     R.tablefile, R.start.bin, 
+                                                     "to", R.end.bin), 
+                                               paste(R.option, R.num , "fold, 
+                                                     n = ", gene.count), i[9]))
+    tkset(combobox.gene.set, kNbFileControlTabNames[8])
+    UpdateEntrys("regions")
+    tkset(combobox.regions.file1, "Pick_file_1")
+    tkset(combobox.regions.file2, "Pick_file_2")
+    close(pb)
+    control.state[3] <<- 0
+    tcl("wm", "attributes", root, topmost = TRUE)
+    return(ComboboxsUpdate())
+  }
+  return()
+}	
+
 # intersect gene lists creating a new one
 IntersectGeneLists <- function() { 
-  compare1 <- tclvalue(tcl.start.file.compare.names1)
-  compare2 <- tclvalue(tcl.start.file.compare.names2)
+  compare1 <- tclvalue(tcl.file.compare.names1)
+  compare2 <- tclvalue(tcl.file.compare.names2)
   if (compare1 != compare2 && control.state[3] != 1) {
     gene.names <- c(unique(list.data$gene.file[[compare1]]),
                        unique(list.data$gene.file[[compare2]]))
@@ -811,7 +909,7 @@ ApplyMath <- function(list.wide.data.frame, use.col, use.dot, use.line,
                       use.nickname, use.x.label) {
   
   # math set and y label
-  use.math <- as.character(tclvalue(tcl.start.math.option))
+  use.math <- as.character(tclvalue(tcl.math.option))
   if (use.math == "mean") {
     use.apply <- function(x) colMeans(x, na.rm = TRUE)
     use.y.label <- "Mean of bin counts"
@@ -827,7 +925,7 @@ ApplyMath <- function(list.wide.data.frame, use.col, use.dot, use.line,
   # and update y label
   r.checkbox.relative.frequency <- as.character(tclvalue(
     tcl.checkbox.relative.frequency))
-  norm.bin <- as.numeric(tclvalue(tcl.start.norm.bin))
+  norm.bin <- as.numeric(tclvalue(tcl.norm.bin))
   
   if (r.checkbox.relative.frequency == 1 && norm.bin == 0) {
     use.y.label <- paste(strsplit(use.y.label, split = " ")[[1]][1], 
@@ -863,18 +961,18 @@ ApplyMath <- function(list.wide.data.frame, use.col, use.dot, use.line,
   list.long.data.frame <- rbind_all(list.applied.math.data.frame)
   
   use.pos.plot.ticks <- Destring(unlist(strsplit(tclvalue(
-    tcl.start.pos.plot.ticks), " ")))
-  use.label.plot.ticks <- unlist(strsplit(tclvalue(tcl.start.label.plot.ticks), 
+    tcl.pos.plot.ticks), " ")))
+  use.label.plot.ticks <- unlist(strsplit(tclvalue(tcl.label.plot.ticks), 
                                           " "))
   if (length(use.label.plot.ticks) != length(use.pos.plot.ticks)) {
     tkmessageBox(message = "The number of Positions and labels are unequal")
     return ()
   }
   
-  use.plot.breaks <- c(Destring(tclvalue(tcl.start.pos.one.line)), 
-                       Destring(tclvalue(tcl.start.pos.two.line)), 
-                       Destring(tclvalue(tcl.start.pos.three.line)), 
-                       Destring(tclvalue(tcl.start.pos.four.line)),
+  use.plot.breaks <- c(Destring(tclvalue(tcl.pos.one.line)), 
+                       Destring(tclvalue(tcl.pos.two.line)), 
+                       Destring(tclvalue(tcl.pos.three.line)), 
+                       Destring(tclvalue(tcl.pos.four.line)),
                        use.pos.plot.ticks)
   
   use.plot.breaks.labels <- c(tclvalue(tcl.one.tss.tts.option), 
@@ -969,8 +1067,10 @@ ComboboxsUpdate <- function() {
 # change in combobox saves vaues and changes tab
 ComboboxsGeneSet <- function() {
   combo.name <- tclvalue(tkget(combobox.gene.set))
-  if (combo.name == "Sort tools list" || combo.name == "Intersect list") {
+  if (combo.name == kNbFileControlTabNames[6] || combo.name == kNbFileControlTabNames[7]) {
     tk2notetab.select(notebook.on.off.tools1, combo.name)
+  } else if (combo.name == kNbFileControlTabNames[8] || combo.name == kNbFileControlTabNames[9]){
+    tk2notetab.select(notebook.on.off.tools2, combo.name)
   } else {
     tmp <- strsplit(combo.name, " " )[[1]]
     tmp2 <- unlist(strsplit(paste(tmp[1], "\n", tmp[2], " ", 
@@ -995,6 +1095,10 @@ ComboboxsGeneSet2 <- function(notebook) {
     UpdateEntrys("sort")
   } else if (tmp[1] == "Intersect") {
     UpdateEntrys("intersect")
+  } else if (tmp[2] == "regions") {
+    UpdateEntrys("regions")
+  } else if (tmp[2] == "ratios") {
+    UpdateEntrys("ratios")
   } else if (length(tmp) == 3) {
     UpdateEntrys(paste("gene" , tmp[3], sep = ""))
   } else {
@@ -1116,7 +1220,7 @@ tkgrid(tklabel(frame.plot.math.settings, text = "Math", width = 35))
 
 tkgrid(tk2combobox(frame.plot.math.settings,
                    value = kMathOptions,
-                   textvariable = tcl.start.math.option, 
+                   textvariable = tcl.math.option, 
                    state = "readonly"), sticky = "n")
 
 checkbox.relative.frequency <- tkcheckbutton(frame.plot.math.settings, 
@@ -1124,18 +1228,17 @@ checkbox.relative.frequency <- tkcheckbutton(frame.plot.math.settings,
                                   text = "Relative Frequency" )
 tkgrid(checkbox.relative.frequency)
 
-checkbox.log2 <- tkcheckbutton(frame.plot.math.settings, 
-                    variable = tcl.checkbox.log2, text = "log2 transformation")
-tkgrid(checkbox.log2)
+tkgrid(tkcheckbutton(frame.plot.math.settings, 
+                    variable = tcl.checkbox.log2, text = "log2 transformation"))
 
 tkgrid(tklistbox(frame.plot.math.settings, 
                  listvariable = tclVar("Norm_to_bin"),
                  height = 1, width = 12, 
                  relief = 'flat'), padx = c(50, 0), sticky = "w")
 
-combobox.norm.bin <- tk2combobox(frame.plot.math.settings,
-                textvariable = tcl.start.norm.bin, state="readonly", width = 3)
-tkgrid(combobox.norm.bin, sticky = "e", column = 0, row = 4, padx = c(0, 50))
+tkgrid(combobox.norm.bin <- tk2combobox(frame.plot.math.settings,
+                textvariable = tcl.norm.bin, state="readonly", width = 3),
+       sticky = "e", column = 0, row = 4, padx = c(0, 50))
 
 tkgrid(frame.plot.math.settings)
 
@@ -1156,7 +1259,7 @@ tkgrid(tklabel(tab.plot.options.line.tick.frame,
 
 combobox.plot.lines <- tk2combobox(tab.plot.options.line.tick.frame, 
                                    value = names(list.plot.lines), 
-                                   textvariable = tcl.start.plot.line.name, 
+                                   textvariable = tcl.plot.line.name, 
                                    state = "readonly", width = 20)
 tkgrid(combobox.plot.lines, column = 0, columnspan = 6, row = 7) 
 tkbind(combobox.plot.lines, '<<ComboboxSelected>>', PlotLines)
@@ -1168,7 +1271,7 @@ tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), padx = c(5, 3),
        pady = c(5, 0), column = 1, row = 8, sticky = "w")
 entry.line.tick.pos.one <- tk2entry(tab.plot.options.line.tick.frame, 
                                     width = 4, 
-                                    textvariable = tcl.start.pos.one.line)
+                                    textvariable = tcl.pos.one.line)
 tkgrid(entry.line.tick.pos.one, column = 2, row = 8, sticky = "w", 
        padx = c(0, 0), pady = c(5, 0))
 
@@ -1179,7 +1282,7 @@ tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), padx = c(5, 3),
        pady = c(3, 0), column = 1, row = 9, sticky = "w")
 entry.line.tick.pos.two <- tk2entry(tab.plot.options.line.tick.frame, 
                                     width = 4, 
-                                    textvariable = tcl.start.pos.two.line)
+                                    textvariable = tcl.pos.two.line)
 tkgrid(entry.line.tick.pos.two, column = 2 , row = 9, sticky = "w", 
        padx = c(0, 0), pady = c(3, 0))
 
@@ -1190,7 +1293,7 @@ tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'),
        padx = c(5, 3), pady = c(5, 0), column = 4, row = 8, sticky = "w")
 entry.line.tick.pos.three <- tk2entry(tab.plot.options.line.tick.frame, 
                                       width = 4, 
-                                      textvariable = tcl.start.pos.three.line)
+                                      textvariable = tcl.pos.three.line)
 tkgrid(entry.line.tick.pos.three, column = 5, row = 8, sticky = "w", 
        padx = c(0, 0), pady = c(3, 0))
 
@@ -1201,7 +1304,7 @@ tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), column = 4,
        row = 9, sticky = "w", padx = c(5, 3), pady = c(5, 0))
 entry.line.tick.pos.four <- tk2entry(tab.plot.options.line.tick.frame, 
                                      width = 4, 
-                                     textvariable = tcl.start.pos.four.line)
+                                     textvariable = tcl.pos.four.line)
 tkgrid(entry.line.tick.pos.four, column = 5, row = 9, sticky = "w", 
        padx = c(0, 0), pady = c(3, 0))
 
@@ -1212,14 +1315,14 @@ tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'Pos'), padx = c(5, 0),
        column = 0, row = 12, sticky = "w")
 entry.line.tick.pos.five <- tk2entry(tab.plot.options.line.tick.frame, 
                                      width = 35,
-                                     textvariable = tcl.start.pos.plot.ticks)
+                                     textvariable = tcl.pos.plot.ticks)
 tkgrid(entry.line.tick.pos.five, column = 1, row = 12, padx = c(0, 0), 
        columnspan = 5, sticky = "w")
 tkgrid(tklabel(tab.plot.options.line.tick.frame, text = 'label'), 
        padx = c(5, 0), column = 0, row = 13, sticky = "w")
 entry.line.tick.label.five <- tk2entry(tab.plot.options.line.tick.frame, 
                                     width = 35, 
-                                    textvariable = tcl.start.label.plot.ticks)
+                                    textvariable = tcl.label.plot.ticks)
 tkgrid(entry.line.tick.label.five, column = 1, row = 13, padx = c(0, 0), 
        columnspan = 5)
 
@@ -1279,7 +1382,7 @@ tkgrid(tklistbox(tab.plot.options.color.set.frame,
 
 combobox.lines <- tk2combobox(tab.plot.options.color.set.frame, 
                               value = kLineOptions, 
-                              textvariable = tcl.start.line.option, state="readonly",
+                              textvariable = tcl.line.option, state="readonly",
                               width = 10)
 tkgrid(combobox.lines, sticky = "w", column = 1, row = 1, padx = c(0, 16)) 
 tkbind(combobox.lines, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
@@ -1290,7 +1393,7 @@ tkgrid(tklistbox(tab.plot.options.color.set.frame,
 
 combobox.dots <- tk2combobox(tab.plot.options.color.set.frame, 
                              value = kDotOptions, 
-                             textvariable = tcl.start.dot.option, state="readonly", 
+                             textvariable = tcl.dot.option, state="readonly", 
                              width = 10) 
 tkgrid(combobox.dots, sticky = "w", column = 1, row = 2, padx = c(0, 16)) 
 tkbind(combobox.dots, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
@@ -1301,17 +1404,6 @@ tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20,
                 textvariable = tcl.header), padx = c(5, 0), pady = c(0, 2), 
        column = 1, row = 3)
 
-tkgrid(tklabel(tab.plot.options.color.set.frame, text = "Header"), 
-       padx = c(5, 1), pady = c(0, 2))
-tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20, 
-                textvariable = tcl.header),  padx = c(5, 0), pady = c(0, 2), 
-       column = 1, row = 4)
-
-tkgrid(tklabel(tab.plot.options.color.set.frame, text = "Header"), 
-       padx = c(5, 1), pady = c(0, 2))
-tkgrid(tk2entry(tab.plot.options.color.set.frame, width = 20, 
-                textvariable = tcl.header), padx = c(5, 0), pady = c(0, 2), 
-       column = 1, row = 5)
 
 # frame for gene set and file options and info
 frame.geneset.file.select <- tkframe(frame.common.items, relief = 'ridge', 
@@ -1325,7 +1417,7 @@ tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("List"),
                  height = 1, width = 5, relief = 'flat'), padx = c(5, 0))
 combobox.gene.set <- tk2combobox(frame.geneset.file.select, 
                                  value = kNbFileControlTabNames,
-                            textvariable = tcl.start.file.control.tab.names, 
+                            textvariable = tcl.file.control.tab.names, 
                             state = "readonly", width = 25)
 tkgrid(combobox.gene.set, column = 1, row = 1)
 tkbind(combobox.gene.set, "<<ComboboxSelected>>", ComboboxsGeneSet)
@@ -1333,7 +1425,7 @@ tkbind(combobox.gene.set, "<<ComboboxSelected>>", ComboboxsGeneSet)
 tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("File"), 
                  height = 1, width = 5, relief = 'flat'), padx = c(5, 0))
 combobox.file <- tk2combobox(frame.geneset.file.select, 
-            textvariable = tcl.start.tablefile, state = "readonly", width = 25)
+            textvariable = tcl.tablefile, state = "readonly", width = 25)
 tkgrid(combobox.file, column = 1, row = 2)
 tkbind(combobox.file, "<<ComboboxSelected>>", ComboboxsUpdate)
 #TODO fix
@@ -1351,12 +1443,12 @@ tkgrid(tklistbox(frame.geneset.file.select, listvariable = tclVar("color"),
 
 combobox.color.sets <- tk2combobox(frame.geneset.file.select, 
                                    value = names(kListColorSet), 
-                                   textvariable = tcl.start.color.set, 
+                                   textvariable = tcl.color.set, 
                                    state = "readonly",
                                    width = 10)
 combobox.color <- tk2combobox(frame.geneset.file.select, 
                  value = kListColorSet[[tclvalue(tkget(combobox.color.sets))]], 
-                         textvariable= tcl.start.color, state = "readonly")
+                         textvariable= tcl.color, state = "readonly")
 tkgrid(combobox.color, sticky = "w", column = 1, row = 4, padx = c(0, 16))
 tkbind(combobox.color, "<<ComboboxSelected>>", ComboboxsUpdateVaribles)
 
@@ -1610,13 +1702,13 @@ tkgrid(tklabel(frame.sort.tools.tab, text = "Sort tools"), columnspan = 2)
 
 tkgrid(tk2combobox(frame.sort.tools.tab,
                    values =  kTopBottomOptions, 
-                   textvariable = tcl.start.top.bottom.option,
+                   textvariable = tcl.top.bottom.option,
                    state = "readonly", width = 8), sticky = "w", 
        columnspan = 2, column = 0, row = 1, padx = c(5, 0)) 
 
 tkgrid(tk2combobox(frame.sort.tools.tab,
                    values =  kTopBottomNum, 
-                   textvariable = tcl.start.top.bottom.num, 
+                   textvariable = tcl.top.bottom.num, 
                    state = "readonly", width = 3), sticky = "we", 
        columnspan = 2, column = 2, row = 1, padx = c(0, 5), pady = c(10, 10))
 
@@ -1624,21 +1716,21 @@ tkgrid(tklistbox(frame.sort.tools.tab, listvariable = tclVar("bins"),
                  height = 1, width = 4, relief = 'flat'), padx = c(5, 0), 
        column = 0, row = 3, sticky ="e")
 combobox.bin.start <- tk2combobox(frame.sort.tools.tab, 
-                                     textvariable = tcl.start.bin.start,
+                                     textvariable = tcl.bin.start,
                                      state = "readonly", width = 3) 
 tkgrid(combobox.bin.start, padx = c(0, 0), column = 1, row = 3, sticky ="w")
 tkbind(combobox.bin.start, "<<ComboboxSelected>>", function()
-       BinStartEndHelper(tcl.start.bin.start, tcl.start.bin.end, 
+       BinStartEndHelper(tcl.bin.start, tcl.bin.end, 
                          combobox.bin.start, combobox.bin.end, 1))
 tkgrid(tklistbox(frame.sort.tools.tab, listvariable = tclVar("to"), 
                  height = 1, width = 2, relief = 'flat'), column = 2, row = 3, 
        padx = c(0, 0), sticky ="w")
 combobox.bin.end <- tk2combobox(frame.sort.tools.tab, 
-                                  textvariable = tcl.start.bin.end,
+                                  textvariable = tcl.bin.end,
                                   state = "readonly", width = 3) 
 tkgrid(combobox.bin.end, column = 3, row = 3, padx = c(0, 10), sticky ="w")
 tkbind(combobox.bin.end, "<<ComboboxSelected>>", function()
-       BinStartEndHelper(tcl.start.bin.start, tcl.start.bin.end, 
+       BinStartEndHelper(tcl.bin.start, tcl.bin.end, 
                          combobox.bin.start, combobox.bin.end, 2))
 
 tkgrid(tkbutton(frame.sort.tools.tab, text = "   Sort   ", 
@@ -1689,7 +1781,7 @@ frame.intersect.tools.tab <- tkframe(notebook.on.off.intersect.tab, relief = 'ri
 tkgrid(tklistbox(frame.intersect.tools.tab, listvariable = tclVar("list:"), 
                  height = 1, width = 4, relief = 'flat'))
 tkgrid(combobox.compare1 <- tk2combobox(frame.intersect.tools.tab,
-                   textvariable = tcl.start.file.compare.names1,
+                   textvariable = tcl.file.compare.names1,
                    state = "readonly") , sticky = "w", column = 1, row = 0)
 
 tkgrid(tklistbox(frame.intersect.tools.tab, 
@@ -1697,7 +1789,7 @@ tkgrid(tklistbox(frame.intersect.tools.tab,
                  height = 1, width = 12, 
                  relief = 'flat'), column = 0, row = 3)
 tkgrid(combobox.compare2 <- tk2combobox(frame.intersect.tools.tab, 
-                   textvariable = tcl.start.file.compare.names2,
+                   textvariable = tcl.file.compare.names2,
                    state="readonly"), sticky = "w", column = 1, row = 3) 
 
 tkgrid(tkbutton(frame.intersect.tools.tab, text = " intersect list ", 
@@ -1741,6 +1833,135 @@ notebook.main.tools2.tab <- tk2notetab(notebook.main, "Tools2")
 frame.tools2 <- tkframe(notebook.main.tools2.tab, relief = 'ridge', 
                         borderwidth = 5)
 
+notebook.on.off.tools2 <- tk2notebook(frame.tools2, tabs = c("Compare regions", 
+                                                             "Compare ratios"))
+tkgrid(notebook.on.off.tools2)
+
+notebook.on.off.regions.tab <- tk2notetab(notebook.on.off.tools2, 
+                                       "Compare regions")
+tkbind(notebook.on.off.regions.tab, "<Visibility>", function() 
+  ComboboxsGeneSet2(notebook.on.off.tools2))
+
+# box for sort tool
+frame.regions.tools.tab <- tkframe(notebook.on.off.regions.tab, relief = 'ridge', 
+                                borderwidth = 5)
+
+tkgrid(tklabel(frame.regions.tools.tab, text = "Compare regions"), 
+       columnspan = 3) 
+
+tkgrid(combobox.regions.file1 <- tk2combobox(frame.regions.tools.tab,
+                                             textvariable = tcl.file1.regions,
+                                             state = "readonly"), 
+       columnspan = 2, sticky = "w", column = 0, row = 1)
+tkgrid(combobox.regions.file2 <- tk2combobox(frame.regions.tools.tab,
+                                        textvariable = tcl.file2.regions,
+                                        state = "readonly"), 
+       columnspan = 2, sticky = "e", column = 1, row = 1)
+tkgrid(tklabel(frame.regions.tools.tab, text = "Fold +"), 
+       column = 0, row = 2)
+tkgrid(combobox.bin.fold.regions <- tk2combobox(frame.regions.tools.tab, 
+                                                textvariable = tcl.bin.fold.regions,
+                                                value = kFoldList,
+                                                state = "readonly", width = 4),
+       column = 1, row = 2)
+tkgrid(tk2combobox(frame.regions.tools.tab,
+                   values =  kInOutOptions, 
+                   textvariable = tcl.in.out.option.regions,
+                   state = "readonly", width = 8), sticky = "w", 
+                   column = 2, row = 2) 
+
+tkgrid(tklabel(frame.regions.tools.tab, text = "bins"), 
+       column = 0, row = 3)
+combobox.bin.start.regions <- tk2combobox(frame.regions.tools.tab, 
+                                  textvariable = tcl.bin.start.regions,
+                                  state = "readonly", width = 3) 
+tkgrid(combobox.bin.start.regions, column = 1, row = 3)
+tkbind(combobox.bin.start.regions, "<<ComboboxSelected>>", function()
+  BinStartEndHelper(tcl.bin.start.regions, tcl.bin.end.regions, 
+                    combobox.bin.start.regions, combobox.bin.end.regions, 1))
+tkgrid(tklabel(frame.regions.tools.tab, text = ":"), 
+       column = 2, row = 3, sticky = "w", padx = c(4,0))
+combobox.bin.end.regions <- tk2combobox(frame.regions.tools.tab, 
+                                textvariable = tcl.bin.end.regions,
+                                state = "readonly", width = 3) 
+tkgrid(combobox.bin.end.regions, column = 2, row = 3, sticky = "e", padx = c(0,5))
+tkbind(combobox.bin.end.regions, "<<ComboboxSelected>>", function()
+  BinStartEndHelper(tcl.bin.start.regions, tcl.bin.end.regions, 
+                    combobox.bin.start.regions, combobox.bin.end.regions, 2))
+
+tkgrid(tkbutton(frame.regions.tools.tab, text = "Compare regions", 
+                command =  function() OnOk()), 
+       column = 0, row = 4, columnspan = 4, pady = c(10, 10))
+
+tkgrid(frame.regions.tools.tab, column = 0, row = 0, sticky = 'n')
+
+# on off tab for regions
+frame.regions.tab <- tkframe(notebook.on.off.regions.tab)
+
+label.regions.file <- tklabel(frame.regions.tab, text = "list of table files")
+tkgrid(label.regions.file, columnspan = 3)
+label.regions.length <- tklabel(frame.regions.tab, text = "n = ")
+tkgrid(label.regions.length, columnspan = 3)
+
+listbox.regions.on <- tk2listbox(frame.regions.tab, width = 35, height = 5)
+tkgrid(listbox.regions.on, columnspan = 3)
+tkgrid(tklabel(frame.regions.tab, text ="Plot list"), columnspan = 3)
+tkgrid(tkbutton(frame.regions.tab, text = "<<Switch>>", command = function() 
+  MoveSelectToOtherEntry(listbox.regions.on, listbox.regions.off)), 
+  tkbutton(frame.regions.tab, text = "<<All On>>", command = function() 
+    MoveAllToOtherEntry(listbox.regions.on, listbox.regions.off, "on")), 
+  tkbutton(frame.regions.tab, text = "<<All Off>>", command = function() 
+    MoveAllToOtherEntry(listbox.regions.on, listbox.regions.off, "off")), 
+  sticky = 'we')
+tkgrid(tklabel(frame.regions.tab, text ="Don't plot list"), columnspan = 3)
+listbox.regions.off <- tk2listbox(frame.regions.tab, width = 35, height = 5)
+tkgrid(listbox.regions.off, columnspan = 3)
+# TODO save function
+tkgrid(tkbutton(frame.regions.tab, text = " Save gene list ", 
+                font =c('bold', 15),
+                command =  function() OnOk()), row = 7, 
+       columnspan = 3)
+
+tkgrid(frame.regions.tab)
+
+# on off tab for ratios tool
+notebook.on.off.ratios.tab <- tk2notetab(notebook.on.off.tools2, 
+                                         "Compare ratios")
+tkbind(notebook.on.off.ratios.tab, "<Visibility>", function() 
+  ComboboxsGeneSet2(notebook.on.off.tools2))
+
+#frame for ratios tools 
+frame.ratios.tools.tab <- tkframe(notebook.on.off.ratios.tab, relief = 'ridge', 
+                                     borderwidth = 5)
+
+tkgrid(frame.ratios.tools.tab)
+
+frame.ratios.tab <- tkframe(notebook.on.off.ratios.tab)
+
+label.ratios.file <- tklabel(frame.ratios.tab, text = "list of table files")
+tkgrid(label.ratios.file, columnspan = 3)
+label.ratios.length <- tklabel(frame.ratios.tab, text = "n = ")
+tkgrid(label.ratios.length, columnspan = 3)
+
+listbox.ratios.on <- tk2listbox(frame.ratios.tab, width = 35, height = 5)
+tkgrid(listbox.ratios.on, columnspan = 3)
+tkgrid(tklabel(frame.ratios.tab, text ="Plot list"), columnspan = 3)
+tkgrid(tkbutton(frame.ratios.tab, text = "<<Switch>>", command = function() 
+  MoveSelectToOtherEntry(listbox.ratios.on, listbox.ratios.off)), 
+  tkbutton(frame.ratios.tab, text = "<<All On>>", command = function() 
+    MoveAllToOtherEntry(listbox.ratios.on, listbox.ratios.off, "on")), 
+  tkbutton(frame.ratios.tab, text = "<<All Off>>", command = function() 
+    MoveAllToOtherEntry(listbox.ratios.on, listbox.ratios.off, "off"
+    )), sticky = 'we')
+tkgrid(tklabel(frame.ratios.tab, text ="Don't plot list"), columnspan = 3)
+listbox.ratios.off <- tk2listbox(frame.ratios.tab, width = 35, height = 5)
+tkgrid(listbox.ratios.off, columnspan = 3)
+tkgrid(tkbutton(frame.ratios.tab, text = " Save gene list ", 
+                font =c('bold', 15),
+                command =  function() OnOk()), 
+       row = 7, columnspan = 3)
+
+tkgrid(frame.ratios.tab)
 tkgrid(frame.tools2)
 
 # tab for display genes ----
