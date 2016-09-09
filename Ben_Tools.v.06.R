@@ -841,6 +841,7 @@ quit_Program <- function() {
 	if(BusyTest()){
 		CloseSubWindows(c(4:2))
 		tkdestroy(mainframe)
+		tkdestroy(tt)
 		dev.off()
 	}else{
 		return()
@@ -1525,7 +1526,7 @@ OnOK <- function(){
 		Pos_five <<- tclVar(1)
 		Pos_six <<- tclVar(70)
 	}
-	tkdestroy(tt)
+	#tkdestroy(tt)
 
 	
 	mainframe <<- tktoplevel() #container for it all
@@ -2077,10 +2078,11 @@ tkinsert(mylist, 0, "543 bins 20,20,40", "5 1.5k-2k 70 bins", "543 bins 10,10,10
 tkpack(mylist, pady = c(10, 10), padx = c(10, 10), side = "left")
 tkpack(yscr, fill = 'y', side = "left")
 
+
 swapFrame <- function(){ 
 	if(STATE[1] == 0 & STATE[5] == 0){
 		if(as.integer(tksize(active_list)) == 0){
-			return(FALSE)
+			#return()
 		}
 		STATE[1] <<- 1
 		#tkconfigure(cb_mainlist, state = "disabled")
@@ -2095,5 +2097,5 @@ swapFrame <- function(){
 		UpdateFileLists(as.integer(tksize(file_list)), NULL, file_list, gene_list0,	gene_list1, gene_list2, gene_list3, 
 			gene_main_count, gene_list0_count,	gene_list1_count, gene_list2_count, gene_list3_count, c(1:4), FALSE, 0)
 	}
-	return(TRUE)
+	return()
 }
