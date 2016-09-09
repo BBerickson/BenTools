@@ -123,6 +123,7 @@ tcl_checkbox_relative_gene_frequency <- tclVar(0)
 tcl_checkbox_log2 <- tclVar(0)
 tcl_checkbox_comment <- tclVar(0) # 1 = don't show save comment popup
 tcl_checkbox_split <- tclVar(0) # change the output of saved gene lists
+tcl_checkbox_cdf_innerjoin <- tclVar(0) # merge the output lists or not
 
 # file list varibles  ----   
 
@@ -1607,13 +1608,14 @@ CumulativeDistribution <- function(){
     outlist[[j]] <<- data.frame(gene = apply_bins1[ , 1], sum = apply_bins1$sum1 / apply_bins1$sum2, stringsAsFactors = FALSE)
   } )
   nick_name2 <- NULL
+  my_xlab <- NULL
   for(i in nick_name){
     use_nickname <- strsplit(sub("-", " ", i), " ")[[1]]
     myTCL <- tclvalue(get(paste0("tcl_", use_nickname[1], "file")))
     current_nickname <- paste(gsub("(.{17})", "\\1\n", myTCL), gsub("(.{17})", "\\1\n", use_nickname[2]), sep = '- \n')
     nick_name2 <- c(nick_name2, current_nickname)
     legend_space <<- max(legend_space, (length(strsplit(current_nickname, "\n")[[1]]) - 0.5))
-    my_xlab <- c(my_xlab, paste(myTCL," n = ", nrow(outlist[[i]])))
+    my_xlab <- c(my_xlab, paste(myTCL))
   }
   outlist2 <- NULL
   df <- lapply(seq_along(outlist), function(i){
@@ -1622,8 +1624,7 @@ CumulativeDistribution <- function(){
     } else {
       ix <- sort(outlist[[i]][,2], decreasing = TRUE, index = T)$ix
     }
-    print(1 + ceiling(length(ix)*use_per_bottom):(length(ix) - ceiling(length(ix)*use_per_top)))
-    ix <- ix[1 + ceiling(length(ix)*use_per_bottom):(length(ix) - ceiling(length(ix)*use_per_top))]
+    ix <- ix[ceiling(length(ix)*use_per_top):(length(ix) - ceiling(length(ix)*use_per_bottom))]
     outlist2 <<- c(outlist2, outlist[[i]][,1][ix])
     if(i > 1){
       outlist2 <<- outlist2[duplicated(outlist2)]
@@ -1644,12 +1645,21 @@ CumulativeDistribution <- function(){
   
   for(i in seq_along(df)){
     names(df[[i]]) <- c("bin", "set", "value", "gene")
-    df[[i]] <- inner_join(df[[i]], enesg, by = 'gene')
     names(use_col)[i] <- unique(df[[i]]$set)
     gene_list_label <- get(paste("label_cdf_list", i, sep = ""))
     gene_list <- get(paste("listbox_gene_cdf_list", i, sep = ""))
+    if(tclvalue(tcl_checkbox_cdf_innerjoin) == 1){
+      df[[i]] <- inner_join(df[[i]], enesg, by = 'gene')
+      my_xlab <- unique(my_xlab)
+      if(!is.na(my_xlab[i])){
+        my_xlab[i] <- paste(my_xlab[i], ' n = ', length(df[[i]]$gene))
+      }
+    } else{
+      my_xlab[i] <- paste(my_xlab[i], ' n = ', length(df[[i]]$gene))
+    }
     tkconfigure(gene_list, listvariable = tclVar(paste(df[[i]]$gene)))
     tkconfigure(gene_list_label, text = paste("File", i, ' n = ', (as.integer(tksize(gene_list)))))
+    
   }
   df2 <- bind_rows(df)
   GGplotC(df2, unique(my_xlab), use_col, use_header, legend_space)
@@ -3014,7 +3024,7 @@ frame_cdf_tab_buttons <- tkframe(frame_cdf_tab, relief = 'ridge',
 tkgrid(tklabel(frame_cdf_tab_buttons, text = "cdf tools"), columnspan = 4, padx = c(50, 0)) 
 
 tkgrid(tklabel(frame_cdf_tab_buttons, text = "bins"),
-       padx = c(50, 0), column = 0, row = 3, sticky ="e")
+       padx = c(10, 0), column = 0, row = 3, sticky ="e")
 
 combobox_bin_start1_cdf <- tk2combobox(frame_cdf_tab_buttons, 
                                           textvariable = tcl_bin_start1_cdf,
@@ -3036,7 +3046,7 @@ tkgrid(tklabel(frame_cdf_tab_buttons, text = " / "),
        padx = c(0, 0), column = 4, row = 3, sticky ="w")
 
 tkgrid(tklabel(frame_cdf_tab_buttons, text = "bins"),
-       padx = c(50, 0), column = 0, row = 4, sticky ="e")
+       padx = c(10, 0), column = 0, row = 4, sticky ="e")
 
 combobox_bin_start2_cdf <- tk2combobox(frame_cdf_tab_buttons, 
                                           textvariable = tcl_bin_start2_cdf,
@@ -3057,16 +3067,19 @@ tkbind(combobox_bin_end2_cdf, "<<ComboboxSelected>>", function()
 
 tkgrid(tk2button(frame_cdf_tab_buttons, text = "   cdf plot  ", 
                  command =  function() CumulativeDistribution()), 
-       column = 0, row = 5, columnspan = 2, pady = c(5, 5), padx = c(50, 0))
+       column = 0, row = 5, columnspan = 2, pady = c(5, 5), padx = c(10, 0))
 
 tkgrid(tk2combobox(frame_cdf_tab_buttons,
                    values =  kAccDec, 
                    textvariable = tcl_acc_dec_cdf, 
-                   state = "readonly", width = 7), sticky = "w", 
-       columnspan = 3, column = 2, row = 5, padx = c(0, 5), pady = c(5, 5))
+                   state = "readonly", width = 3), sticky = "w", 
+       columnspan = 2, column = 1, row = 5, padx = c(55, 5), pady = c(5, 5))
+
+tkgrid(tkcheckbutton(frame_cdf_tab_buttons, variable = tcl_checkbox_cdf_innerjoin, text = "merge lists?"),
+       columnspan = 2, column = 3, row = 5)
 
 tkgrid(tklabel(frame_cdf_tab_buttons, text = "rm low hi"),
-       padx = c(50, 0), column = 0, row = 6, sticky ="w")
+       padx = c(10, 0), column = 0, row = 6, sticky ="w")
 
 tkgrid(tk2combobox(frame_cdf_tab_buttons,
                    values =  kQuntile, 
