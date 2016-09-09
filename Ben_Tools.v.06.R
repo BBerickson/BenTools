@@ -1,8 +1,6 @@
-my_version_num <- 'Ben Tools v.06'
+my_version_num <- 'Ben Tools v.06a'
 
-# fix cancel load file if there is no file already loaded
-# fix if all bins are NA/0 ploting
-# remved the header, ylable and xlable defalut on plot
+# fixed to gene tools to work on MAC
 
 
 if(require("tcltk")){
@@ -1303,7 +1301,7 @@ LineDotPlot <- function(apply_plot, use_bins, ylim, Colors, use_legend, subtmp, 
 		for(i in 1:pcount){ 
 		  my_score <- apply_plot[(use_bins*(i-1)+1):(use_bins*i)]
 			points(my_score, type="o",col=Colors[i] ,pch=mydots[i], 
-				cex = 1.2, lwd=3, lty=mylines[i])
+				cex = 1.5, lwd=3, lty=mylines[i])
 			if(mylines[i]==0){
         
 			  #GENE_LIST[[1]][[8]] <<- c(GENE_LIST[[1]][[8]], apply_plot[(use_bins*(i-1)+1):(use_bins*i)])
@@ -1526,7 +1524,7 @@ OnOK <- function(){
 		Pos_five <<- tclVar(1)
 		Pos_six <<- tclVar(70)
 	}
-	#tkdestroy(tt)
+	#tkdestroy(tt)  # if destryed swapFrame() linked to button does not work
 
 	
 	mainframe <<- tktoplevel() #container for it all
