@@ -1,0 +1,34 @@
+Ben tools v7
+
+http://www.sciviews.org/recipes/tcltk/toc/
+
+add lower cdf remove data points and add more points
+add more points to sort upper and lower limits
+####### version C?########
+add a higher level of notbook and group simular tools together?
+  sort, quantil
+  region, ratios, cdf
+  cluster
+  intersect
+
+get some basic sticky and weighting set up for sizeing 
+... move grid to proper places
+
+add save button to grab tool tab
+add controls in Opiontions popup a place for handaling NA and 0  when loading and deviding?
+#############################
+
+changes in B
+
+CDF own tab and plot same colors, and ordered gene list with % cut off
+width and hight master size
+can load gene list then norm now works
+fix intersecting full gene list and loading files
+fix remove files
+restart resets the lables of the gene lists boxes
+removing all files no longer has pop up and color is handled better
+add save gene list notes and pop up on/off in top menu control
+save file has sugjested name
+fix zoomin main plot yaxis
+added quantiles to cluster tab
+added in options to split gene out list on ; + - |

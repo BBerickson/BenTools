@@ -1,10 +1,11 @@
 # Created by Benjamin Erickson  ----
 
-#expandTk <- function(){
-version_num <- 'Ben Tools v.07.a'
+expandTk <- function(){
+version_num <- 'Ben Tools v.07.b'
 # For plotting Bentley lab table files and generating gene list
 
-kHeight <- 5 # 1 for smaller screans and PCs
+kHeight <- 5 # 1 for smaller screens and PCs
+kWidth <- 30 # use smaller for small screens
 # load packages ----
 
 my_packages <- function(x){
@@ -38,11 +39,12 @@ kTopBottomOptions <- c("Top%", "Bottom%")
 kInOutOptions <- c("inclusive", "exclusive") 
 kTopBottomNum <- c(1, seq(5, 100, by = 5))
 kAccDec <- c("Accend", "Deccend")
+kQuntile <- c("0%", "1%", paste0(seq(5, 45, 5),"%"))
 kFoldList <- round(seq(1, 4, by = 0.2),digits=4)
 # plot lines and ticks with labels
 list_plot_lines <- list("543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
                         "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5),
-                        "5 prim 2k 2k 160bins" = c(80.5, "", "", ""),
+                        "5 prim 2k 2k 40bins" = c(20.5, "", "", ""),
                         "5 prim 1k 1k 80bins" = c(40.5, "", "", ""))
 list_plot_ticks <- list("543 bins 20,20,40" = 
   list('name' = c('-1450 -950 -450 +450 +950 +1450 +1950 +2450 +2950 +3450'),
@@ -50,9 +52,9 @@ list_plot_ticks <- list("543 bins 20,20,40" =
                         "543 bins 10,10,10" = 
   list('name' = c('-450', '+450'),
          'loc' = c(1,30)),
-  "5 prim 2k 2k 160bins" = 
-    list('name' = c('-2000', '-750', '-500', '500', '750', '2000'),
-         'loc' = c(1, 50, 60, 100, 110, 160)),
+  "5 prim 2k 2k 40bins" = 
+    list('name' = c('-2000', '-1000', '-500', '500', '100', '2000'),
+         'loc' = c(1, 10, 15, 25, 30, 40)),
   "5 prim 1k 1k 80bins" = 
     list('name' = c('-1000', '-500', '500', '1000'),
          'loc' = c(1, 20, 60, 80)))
@@ -69,13 +71,19 @@ tcl_list1file <- tclVar("cluster 1")
 tcl_list2file <- tclVar("cluster 2")
 tcl_list3file <- tclVar("cluster 3")
 tcl_list4file <- tclVar("cluster 4")
+tcl_listq1file <- tclVar("quantile 1")
+tcl_listq2file <- tclVar("quantile 2")
+tcl_listq3file <- tclVar("quantile 3")
+tcl_listq4file <- tclVar("quantile 4")
 tcl_toolfile <- tclVar("tool")
-
 tcl_line_option <- tclVar(kLineOptions[1])
 tcl_dot_option <- tclVar(kDotOptions[1])
 tcl_top_bottom_option <- tclVar(kTopBottomOptions[1])
 tcl_top_bottom_num <- tclVar(kTopBottomNum[6])
 tcl_acc_dec <- tclVar(kAccDec[2])
+tcl_acc_dec_cdf <- tclVar(kAccDec[2])
+tcl_quntile_cdf_bottom <- tclVar(kQuntile[1])
+tcl_quntile_cdf_top <- tclVar(kQuntile[1])
 tcl_bin_fold_region <- tclVar(kFoldList[6])
 tcl_in_out_option_ratios <- tclVar(kInOutOptions[1])
 tcl_bin_fold_ratios <- tclVar(kFoldList[6])
@@ -113,6 +121,8 @@ tcl_pos_plot_ticks <- tclVar(list_plot_ticks[[1]][[2]])
 tcl_checkbox_relative_frequency <- tclVar(0)
 tcl_checkbox_relative_gene_frequency <- tclVar(0)
 tcl_checkbox_log2 <- tclVar(0)
+tcl_checkbox_comment <- tclVar(0) # 1 = don't show save comment popup
+tcl_checkbox_split <- tclVar(0) # change the output of saved gene lists
 
 # file list varibles  ----   
 
@@ -122,7 +132,7 @@ LIST_DATA <- list(table_file = list(), # [[]] gene X1 X2 ...
                   gene_info = list(),  # for holding gene file info in a list of lists, a set for $common and each $gene file(s) [c("dot", "line", "color", plot?, NickName)]
                   clust = list())      # Cluster holder
 
-STATE <- c(0, 'common') # [1] for open option window, [2] for a selected box
+STATE <- c(0, 'common', 'cluster') # [1] for open option window, [2] for a selected box, [3] tool use help
 
 # functions ----
 
@@ -131,6 +141,14 @@ OpenWindowControl <- function(){
   if(STATE[1] == 1){
     STATE[1] <<- 0
     tkdestroy(SampleOptionsFrame)
+    tkraise(root)
+  } else if(STATE[1] == 3){
+    STATE[1] <<- 0
+    tkdestroy(CommentFrame)
+    tkraise(root)
+  } else if(STATE[1] == 4){
+    STATE[1] <<- 0
+    tkdestroy(OptionsFrame)
     tkraise(root)
   }
   if(STATE[1] == 2){
@@ -226,9 +244,62 @@ BinStartEndHelper <- function(startbin, endbin, combostart, comboend, num) {
   }
 }
 
+# find quantiles
+FindQuantile <- function() {
+  if (as.integer(tksize(listbox_active_cluster)) < 1) {
+    return ()
+  }
+  STATE[3] <<- "quantile"
+  pb <<- tkProgressBar(title = "Finding clusters, please be patient!!",
+                       width = 300)
+  setTkProgressBar(pb, 100, label =  "Finding clusters, please be patient!!")
+  
+  R_start_bin <- as.integer(tclvalue(tcl_bin_start_cluster)) + 1
+  R_stop_bin <- as.integer(tclvalue(tcl_bin_end_cluster)) + 1
+  
+  nick_name <-  strsplit(sub('-', '\n!', 
+                             as.character(tkget(listbox_active_cluster, 0, 'end'))), '\n!')[[1]]
+  my_ref  <- LIST_DATA$gene_info[[nick_name[1]]][[nick_name[2]]][5]
+  enesg <- data.frame(gene = LIST_DATA$gene_file[[nick_name[1]]]$use, stringsAsFactors = F) # here
+  df <- list()
+  df[[nick_name[2]]] <- inner_join(enesg, LIST_DATA$table_file[[my_ref]], by = 'gene')
+  df[[2]] <- data.frame(gene = df[[nick_name[2]]]$gene, value = rowMeans(df[[nick_name[2]]][,R_start_bin:R_stop_bin][ ,-1], na.rm = T), stringsAsFactors = F)
+  qq <- quantile(df[[2]]$value, na.rm = TRUE)
+  enesg1 <- df[[2]]$gene[df[[2]]$value < qq[2]]
+  enesg2 <- df[[2]]$gene[df[[2]]$value >= qq[2] & df[[2]]$value < qq[3]]
+  enesg3 <- df[[2]]$gene[df[[2]]$value >= qq[3] & df[[2]]$value < qq[4]]
+  enesg4 <- df[[2]]$gene[df[[2]]$value >= qq[4]]
+  clist <- list()
+  gene_info <- list(list())
+  for( i in 1 : 4){
+    color_safe <- i %% length(kListColorSet)
+    if (color_safe == 0) {
+      color_safe <- 1
+    }
+    my_gene_list <- unlist(get(paste("enesg", i, sep = "")))
+    if(length(my_gene_list) > 0){
+      clist[[paste("listq", i, sep = "")]]$use <- my_gene_list
+      color_select <- kListColorSet[color_safe]
+      gene_info[[paste("listq", i, sep = "")]][[my_ref]] <- c(kDotOptions[1],
+                                                             kLineOptions[1], 
+                                                             color_select, 
+                                                             1,
+                                                             nick_name[2])
+    }
+    gene_list_label <- get(paste("label_cluster_list", i, sep = ""))
+    gene_list <- get(paste("listbox_gene_cluster_list", i, sep = ""))
+    tkconfigure(gene_list, listvariable = tclVar(my_gene_list))
+    tkconfigure(gene_list_label, text = paste('quantile', i, ' n = ', (as.integer(tksize(gene_list)))))
+  }
+  close(pb)
+  MakeDataFrame(sel_list = NULL, table_file = df,
+                gene_file = clist, gene_info = gene_info)
+  tkraise(root)
+}
+
 # Change the number of clusters
 ClusterNumList <- function(cm){
-  if(as.numeric(tksize(listbox_active_cluster)) < 1){
+  if(as.numeric(tksize(listbox_active_cluster)) < 1 | length(cm) < 1 | STATE[3] != 'cluster'){
     return()
   }
   DActLst(entry_cluster_search, sapply(c(1:4), function(x){
@@ -240,6 +311,9 @@ ClusterNumList <- function(cm){
                              as.character(tkget(listbox_active_cluster, 0, 'end'))), '\n!')[[1]]
   my_ref  <- LIST_DATA$gene_info[[nick_name[1]]][[nick_name[2]]][5]
   enesg <- data.frame(gene = LIST_DATA$gene_file[[nick_name[1]]]$use, stringsAsFactors = F) # here
+  if(length(enesg$gene) < R_cluster){
+    return()
+  }
   df <- list()
   df[[nick_name[2]]] <- inner_join(enesg, LIST_DATA$table_file[[my_ref]], by = 'gene')
   clist <- list()
@@ -261,7 +335,7 @@ ClusterNumList <- function(cm){
     gene_list_label <- get(paste("label_cluster_list", i, sep = ""))
     gene_list <- get(paste("listbox_gene_cluster_list", i, sep = ""))
     tkconfigure(gene_list, listvariable = tclVar(paste(clist[[i]]$use)))
-    tkconfigure(gene_list_label, text = paste('n = ', (as.integer(tksize(gene_list)))))
+    tkconfigure(gene_list_label, text = paste('cluster', i, ' n = ', (as.integer(tksize(gene_list)))))
   }
   MakeDataFrame(sel_list = NULL, table_file = df,
                 gene_file = clist, gene_info = gene_info)
@@ -290,7 +364,6 @@ ListBoxSelectHelper <- function(listboxgene){
     }
   } else if (listboxgene[1] == "cluster"){
     my_tab <- strsplit(tk2notetab.text(notebook_cluster), split = " ")[[1]]
-    
     listboxgene <- get(paste("listbox_gene_cluster_list" ,my_tab[2] , sep = ""))
   } else if (listboxgene[1] == "intersect"){
     my_tab <- tk2notetab.text(notebook_intersect)
@@ -299,6 +372,9 @@ ListBoxSelectHelper <- function(listboxgene){
     } else {
       listboxgene <- get("listbox_intersect_exclusive")
     }
+  } else if (listboxgene[1] == "cdf"){
+    my_tab <- strsplit(tk2notetab.text(notebook_cluster), split = " ")[[1]]
+    listboxgene <- get(paste("listbox_gene_cdf_list" ,my_tab[2] , sep = ""))
   }
   return(listboxgene)
 }
@@ -306,8 +382,11 @@ ListBoxSelectHelper <- function(listboxgene){
 # helper for ploting selected gene list
 SelectGeneListPlotHelper <- function(listboxgene){
   listname <- tolower(strsplit(tk2notetab.text(notebook_tool),split = "\n")[[1]][1])
+  
   if(listname == "sort"){
     legend_nickname <- paste(listname, "tool")
+  } else if(listboxgene == 'cluster'){
+    legend_nickname <- paste(STATE[3], "tool", tk2notetab.text(get(paste0("notebook_",listname))), "tab")
   } else {
     legend_nickname <- paste(listname, "tool", tk2notetab.text(get(paste0("notebook_",listname))), "tab")
   }
@@ -329,6 +408,8 @@ GeneListPlotHelper <- function(listboxgene){
   listname <- tolower(strsplit(tk2notetab.text(notebook_tool),split = "\n")[[1]][1])
   if(listname == "sort"){
     legend_nickname <- paste(listname, "tool")
+  } else if(listboxgene == 'cluster'){
+    legend_nickname <- paste(STATE[3], "tool", tk2notetab.text(get(paste0("notebook_",listname))), "tab")
   } else {
     legend_nickname <- paste(listname, "tool", tk2notetab.text(get(paste0("notebook_",listname))), "tab")
   }
@@ -373,11 +454,15 @@ ToolListTabHelper <- function(){
 # clears tools
 DActLst <- function(listboxfile, listboxgenes, listboxlengths){
   tkdelete(listboxfile, 0, 'end')
-  for(i in listboxgenes){
-    tkdelete(get(i), 0, "end")
+  if(!is.null(listboxgenes)){
+    for(i in listboxgenes){
+      tkdelete(get(i), 0, "end")
+    }
   }
-  for(i in listboxlengths){
-    tkconfigure(get(i), text = paste("n = 0"))
+  if(!is.null(listboxlengths)){
+    for(i in listboxlengths){
+      tkconfigure(get(i), text = paste("n = 0"))
+    }
   }
 }
 
@@ -405,6 +490,10 @@ DActAll <- function(){
                                       "listbox_intersect_exclusive", "listbox_intersect_combind"),
           c("label_intersect_inclusive", "label_intersect_exclusive", "label_intersect_combind"))
   
+  DActLst(listbox_active_cdf, sapply(c(1:4), function(x){
+    paste("listbox_gene_cdf_list" , x, sep = "")}),
+    sapply(c(1:4), function(x){
+      paste("label_cdf_list" , x, sep = "")}))
 }
 
 # adds selected item(s) to active tool list
@@ -443,7 +532,7 @@ LoadTableFile <- function() {
   
   STATE[1] <<- 2
   full_file_name <- paste(as.character(tkgetOpenFile(multiple = TRUE, filetypes = 
-                                               "{{Table Files} {.table .tab .Table}}")))
+                                               "{{Table Files} {.table .tab .Table}} {{All files} *}")))
   STATE[1] <<- 0
   if (!nchar(full_file_name[1])) { ## file select test   
     tkraise(root)
@@ -496,7 +585,7 @@ LoadTableFile <- function() {
                                            legend_nickname)
           SetComboBoxes(num_bins) # fills out and sets start and stop bins
         }
-        color_safe <- length(LIST_DATA$table_file)+1 %% length(kListColorSet)
+        color_safe <- (length(LIST_DATA$table_file)+1) %% length(kListColorSet)
         if (color_safe == 0) {
           color_safe <- 1
         }
@@ -552,7 +641,7 @@ LoadGeneFile <- function(listboxname) {
   }
   STATE[1] <<- 2
   full_file_name <- tclvalue(tkgetOpenFile(filetypes = 
-                                               "{{Gene List} {.txt}}"))
+                                               "{{Gene List} {.txt}} {{All files} *}"))
   STATE[1] <<- 0
   if (!nchar(full_file_name)) {
     tkraise(root)
@@ -605,7 +694,7 @@ IntersectLoadFile <- function(){
   }
   STATE[1] <<- 2
   full_file_name <- tclvalue(tkgetOpenFile(filetypes = 
-                                             "{{Gene List} {.txt}}"))
+                                             "{{Gene List} {.txt}} {{All files} *}"))
   STATE[1] <<- 0
   if (!nchar(full_file_name)) {
     tkraise(root)
@@ -618,37 +707,143 @@ IntersectLoadFile <- function(){
     
     genefile <- read.table(full_file_name, stringsAsFactors = FALSE,
                            header = FALSE)
-    genefile <- c(genefile, LIST_DATA$gene_file$common$use)
-    genefile <- unique(genefile[duplicated(genefile)])
+    genefile2 <- c(genefile[ ,1], LIST_DATA$gene_file$common$use)
+    genefile2 <- unique(genefile2[duplicated(genefile2)])
     tkraise(root)
-    if(length(genefile) > 0){
-      return(IntersectGeneLists(unique(genefile[ , 1]), legend_nickname))
+    if(length(genefile2) > 0){
+      return(IntersectGeneLists(genefile2, legend_nickname))
     } else{
-      tkmessageBox(message = "Can't use this gene list with")
+      tkmessageBox(message = "Can't use this gene list")
     }
   }
 }
 
 # saves gene list to a file
-SaveGenelist <- function(listboxgene){
+SaveGenelist <- function(listboxgene, activelistbox, toolinfo = " "){
   if (is.character(listboxgene)){
     listboxgene <- ListBoxSelectHelper(listboxgene)
   }
-  if(as.integer(tksize(listboxgene)) > 0){
+  # make toolinfo
+  if(toolinfo == "sort"){
+    R_start_bin <- as.integer(tclvalue(tcl_bin_start_sort))
+    R_end_bin <- as.integer(tclvalue(tcl_bin_end_sort))
+    R_num <- as.integer(tclvalue(tcl_top_bottom_num))
+    R_option <- tclvalue(tcl_top_bottom_option)
+    R_order <- tclvalue(tcl_acc_dec)
+    toolinfo <- paste0("sort tool: ", R_option, R_num, ": bins ", R_start_bin, " to ", R_end_bin, " ", R_order)
+    
+  } else if (toolinfo == "region"){
+    R_start_bin <- as.integer(tclvalue(tcl_bin_start_region))
+    R_end_bin <- as.integer(tclvalue(tcl_bin_end_region))
+    R_num <- as.numeric(tclvalue(tcl_bin_fold_region))
+    my_tab <- strsplit(x = tk2notetab.text(notebook_region), split = " ")[[1]][2]
+    if(my_tab == 1 | my_tab == 2){
+      my_file <- paste(R_num, "fold up in", as.character(tkget(activelistbox, as.numeric(my_tab)-1)))
+    } else {
+      my_file <- paste(my_tab, "fold change", R_num)
+    }
+    toolinfo <- paste("region tool:", my_file, ": bins", R_start_bin, "to", R_end_bin)
+  } else if(toolinfo == "ratios"){
+    R_start1_bin <- as.integer(tclvalue(tcl_bin_start1_ratios))
+    R_end1_bin <- as.integer(tclvalue(tcl_bin_end1_ratios))
+    R_start2_bin <- as.integer(tclvalue(tcl_bin_start2_ratios))
+    R_end2_bin <- as.integer(tclvalue(tcl_bin_end2_ratios))
+    R_num <- as.numeric(tclvalue(tcl_bin_fold_ratios))
+    my_tab <- strsplit(x = tk2notetab.text(notebook_ratios), split = " ")[[1]][2]
+    if(my_tab == 1 | my_tab == 2){
+      my_file <- paste(R_num, "fold up in", as.character(tkget(activelistbox, as.numeric(my_tab)-1)))
+    } else {
+      my_file <- paste(my_tab, "fold change", R_num)
+    }
+    toolinfo <- paste0("region tool: ", my_file, ": bins ", R_start1_bin, ":", R_end1_bin, "/", 
+                       R_start2_bin, ":", R_end2_bin)
+  }else if(toolinfo == "cluster"){
+    R_start_bin <- as.integer(tclvalue(tcl_bin_start_cluster))
+    R_stop_bin <- as.integer(tclvalue(tcl_bin_end_cluster))
+    R_cluster <- as.integer(tclvalue(tcl_bin_cluster_num))
+    my_tab <- strsplit(x = tk2notetab.text(notebook_cluster), split = " ")[[1]][2]
+    toolinfo <- paste("cluster tool: ", R_cluster, "clusters, cluster #", my_tab, ": bins", R_start_bin, "to", R_stop_bin)
+  }else if(toolinfo == "quantile"){
+    R_start_bin <- as.integer(tclvalue(tcl_bin_start_cluster))
+    R_stop_bin <- as.integer(tclvalue(tcl_bin_end_cluster))
+    my_tab <- tk2notetab.text(notebook_cluster)
+    toolinfo <- paste("quantile tool:", my_tab, ", bins", R_start_bin, "to", R_stop_bin)
+  }else if(toolinfo == "intersect"){
+    my_tab <- tk2notetab.text(notebook_intersect)
+    toolinfo <- paste("intersect tool:", my_tab)
+  } else if(toolinfo == "cdf"){
+    R_start1_bin <- as.integer(tclvalue(tcl_bin_start1_cdf))
+    R_end1_bin <- as.integer(tclvalue(tcl_bin_end1_cdf))
+    R_start2_bin <- as.integer(tclvalue(tcl_bin_start2_cdf))
+    R_end2_bin <- as.integer(tclvalue(tcl_bin_end2_cdf))
+    R_order <- tclvalue(tcl_acc_dec_cdf)
+    toolinfo <- paste0("cdf tool: ", R_order, ": bins ", R_start1_bin, ":", R_end1_bin, "/", 
+                       R_start2_bin, ":", R_end2_bin)
+  }
+  
+  OnUpdate <- function(){
+    new_comments <- tclvalue(tkget(NickName, "0.0", "end"))
+    if(nchar(new_comments) < 1){
+      new_comments <- paste("#", Sys.Date())
+    }
+    tkdestroy(CommentFrame)
     STATE[1] <<- 2
-    file_name <- tclvalue(tkgetSaveFile(filetypes = "{{Gene txt Files} {.txt}}"))
+    file_name <- tclvalue(tkgetSaveFile(filetypes = "{{Gene txt Files} {.txt}}", initialfile = toolinfo))
     STATE[1] <<- 0
     if (!nchar(file_name)) { ## file save test
       return()
     }else{
-      if(!grepl(".txt",file_name)){
-        file_name <- paste(file_name,".txt",sep="")
+      if(tclvalue(tcl_checkbox_split) == 1){
+        tt <- c(new_comments, gsub("\\+;|\\-;|\\|", "\t",paste(tkget(listboxgene, 0, 'end'))))
+      } else{
+        tt <- c(new_comments, paste(tkget(listboxgene, 0, 'end')))
       }
-      write.table(paste(tkget(listboxgene, 0, 'end')), file_name, col.names = FALSE, row.names=FALSE, quote=FALSE)
+      write.table(tt, file_name, col.names = FALSE, row.names=FALSE, quote=FALSE)
     }
   }
-}  
- 
+  
+  if(as.integer(tksize(listboxgene)) > 0){
+    CommentFrame <<- tktoplevel()
+    STATE[1] <<- 3
+    tkbind(CommentFrame, "<Destroy>", function() OnDestroy())
+    tkgrid(tklabel(CommentFrame,text="Add or edit comments"), 
+           columnspan = 2)
+    
+    tkgrid(NickName <<- tk2text(CommentFrame, width = kWidth + 40, height = kHeight + 30), 
+           column = 1, row = 2, pady = c(10, 10))
+    tkgrid(tk2button(CommentFrame, text = "Save", 
+                     command = function() OnUpdate()))
+    tkinsert(NickName, "end", paste("#", Sys.Date(), "\n")) 
+    tkinsert(NickName, "end", paste("#", version_num, "\n"))
+    tkinsert(NickName, "end", paste("#", toolinfo, "\n"))
+    tkinsert(NickName, "end", paste("# Lists and file used in tool: \n"))
+    if(tk2notetab.text(notebook_tool) != "Intersect\nTool"){
+      nick_name <- as.character(tkget(activelistbox, 0, 'end'))
+      for(i in nick_name){
+        use_nickname <- strsplit(sub("-", " ", i), " ")[[1]]
+        myTCL <- tclvalue(get(paste0("tcl_", use_nickname[1], "file")))
+        tkinsert(NickName, "end", paste("#", myTCL, "-", use_nickname[2], "\n"))
+      }
+    } else {
+      nick_name <- as.character(tkget(activelistbox, 0, 'end'))
+      tkinsert(NickName, "end", paste("### Gene lists used ###"))
+      for(i in nick_name){
+        tkinsert(NickName, "end", paste("#", i, "\n"))
+      }
+      tkinsert(NickName, "end", paste("### List of files loaded ###"))
+      nick_name <- names(LIST_DATA$table_file)
+      for(i in nick_name){
+        tkinsert(NickName, "end", paste("#", i, "\n"))
+      }
+    }
+    tkinsert(NickName, "end", paste("####  Please start all comment lines with '#'  ####"))
+    if(tclvalue(tcl_checkbox_comment) == 1){
+      OnUpdate()
+    }
+    
+  }
+}
+
 # removes selected file(s)
 RemoveFile <- function() {
   if (length(names(LIST_DATA$table_file)) > 0) {
@@ -658,8 +853,8 @@ RemoveFile <- function() {
       LIST_DATA$table_file[[nickname]] <<- NULL
       sapply(names(LIST_DATA$gene_info),
              function(k) LIST_DATA$gene_info[[k]][[filename]] <<-NULL)
-      kListColorSet <<- c(kListColorSet[seq_along(kListColorSet) > i + 1], 
-                          kListColorSet[seq_along(kListColorSet) <= i + 1])
+      kListColorSet <<- c(kListColorSet[seq_along(kListColorSet) != i + 1], 
+                          kListColorSet[seq_along(kListColorSet) == i + 1])
     }
     for (i in as.integer(tkcurselection(listbox_common_off))) {
       filename <- tclvalue(tkget(listbox_common_off, i))
@@ -667,8 +862,8 @@ RemoveFile <- function() {
       LIST_DATA$table_file[[nickname]] <<- NULL
       sapply(names(LIST_DATA$gene_info),
              function(k) LIST_DATA$gene_info[[k]][[filename]] <<-NULL)
-      kListColorSet <<- c(kListColorSet[seq_along(kListColorSet) > i + 1], 
-                          kListColorSet[seq_along(kListColorSet) <= i + 1])
+      kListColorSet <<- c(kListColorSet[seq_along(kListColorSet) != i + 1], 
+                          kListColorSet[seq_along(kListColorSet) == i + 1])
     }
     if (length(names(LIST_DATA$table_file)) > 1) {
       gene_names <- LIST_DATA$table_file[[1]][,1]
@@ -683,12 +878,13 @@ RemoveFile <- function() {
       return()
   }
     LIST_DATA$gene_file$common$full <<- gene_names
+    LIST_DATA$gene_file$common$use <<- gene_names
     sapply(names(LIST_DATA$gene_file), function(x){
       onlist <- get(paste("listbox_" , x, "_on", sep = ""))
       offlist <- get(paste("listbox_" , x, "_off", sep = ""))
-      if(length(LIST_DATA$gene_file[[x]]$use) > 0){
+      if(length(LIST_DATA$gene_file[[x]]$full) > 0){
         gene_names2 <- c(gene_names, LIST_DATA$gene_file[[x]]$full)
-        LIST_DATA$gene_file$common$use <<- gene_names2[duplicated(gene_names2)]
+        LIST_DATA$gene_file[[x]]$use <<- gene_names2[duplicated(gene_names2)]
         tkdelete(onlist, 0, 'end')
         tkdelete(offlist, 0, 'end')
         lapply(names(LIST_DATA$gene_info[[x]]), function(j){
@@ -701,9 +897,8 @@ RemoveFile <- function() {
           }
         })
       onlabel <- get(paste("label_" , x, "_length", sep = ""))
-      enesg <- c(LIST_DATA$gene_file[[x]]$full, LIST_DATA$gene_file$common$full)
       tkconfigure(onlabel, text = paste("n = " , 
-                                          length(enesg[duplicated(enesg)])))
+                                          length(LIST_DATA$gene_file[[x]]$use)))
       }
         
     })
@@ -717,6 +912,7 @@ RemoveFile <- function() {
 
 # sets the comboboxes with the number of bins
 SetComboBoxes <- function(num_bins){
+  num <- tclvalue(tkget(combobox_plot_lines))
   tkconfigure(combobox_norm_bin, values = c(0:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_start, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end, values = c(1:(num_bins[2] - 1)))
@@ -726,20 +922,20 @@ SetComboBoxes <- function(num_bins){
   tkset(combobox_bin_end_region, num_bins[2] - 1)
   tkconfigure(combobox_bin_start1_ratios, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end1_ratios, values = c(1:(num_bins[2] - 1)))
-  tkset(combobox_bin_start1_ratios, 21)
-  tkset(combobox_bin_end1_ratios, 40)
+  tkset(combobox_bin_start1_ratios, min(floor(list_plot_lines[[num]][3])/2, num_bins[2] - 1))
+  tkset(combobox_bin_end1_ratios, min(floor(list_plot_lines[[num]][3]), num_bins[2] - 1))
   tkconfigure(combobox_bin_start2_ratios, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end2_ratios, values = c(1:(num_bins[2] - 1)))
-  tkset(combobox_bin_start2_ratios, 10)
-  tkset(combobox_bin_end2_ratios, 20)
+  tkset(combobox_bin_start2_ratios, min(floor(list_plot_lines[[num]][3]) + 1, num_bins[2] - 1))
+  tkset(combobox_bin_end2_ratios, min(floor(list_plot_lines[[num]][4]), num_bins[2] - 1))
   tkconfigure(combobox_bin_start1_cdf, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end1_cdf, values = c(1:(num_bins[2] - 1)))
-  tkset(combobox_bin_start1_cdf, 21)
-  tkset(combobox_bin_end1_cdf, 40)
+  tkset(combobox_bin_start1_cdf, min(floor(list_plot_lines[[num]][3])/2, num_bins[2] - 1))
+  tkset(combobox_bin_end1_cdf, min(floor(list_plot_lines[[num]][3]), num_bins[2] - 1))
   tkconfigure(combobox_bin_start2_cdf, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end2_cdf, values = c(1:(num_bins[2] - 1)))
-  tkset(combobox_bin_start2_cdf, 10)
-  tkset(combobox_bin_end2_cdf, 20)
+  tkset(combobox_bin_start2_cdf, min(floor(list_plot_lines[[num]][3]) +1, num_bins[2] - 1))
+  tkset(combobox_bin_end2_cdf, min(floor(list_plot_lines[[num]][4]), num_bins[2] - 1))
   tkconfigure(combobox_bin_start_cluster, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end_cluster, values = c(1:(num_bins[2] - 1)))
   tkset(combobox_bin_end_cluster, num_bins[2] - 1)
@@ -747,6 +943,28 @@ SetComboBoxes <- function(num_bins){
   tkconfigure(combobox_bin_end_sort, values = c(1:(num_bins[2] - 1)))
   tkset(combobox_bin_end_sort, num_bins[2] - 1)
   tkconfigure(combobox_bin_cluster_num, values = c(2:4))
+}
+
+# global options box
+GlobalOptions <- function(){
+  onOK <- function(){
+    tkdestroy(OptionsFrame)
+    STATE[1] <<- 0
+  }
+  OptionsFrame <<- tktoplevel()
+  STATE[1] <<- 4
+  tkbind(OptionsFrame, "<Destroy>", function() OnDestroy())
+  tkgrid(tklabel(OptionsFrame,text="Edit options"), 
+         columnspan = 2)
+  
+  tkgrid(tkcheckbutton(OptionsFrame, variable = tcl_checkbox_comment, text = "Don't Show save comment box?"))
+  
+  tkgrid(tkcheckbutton(OptionsFrame, variable = tcl_checkbox_split, text = "Split saved gene list?"))
+  
+  tkgrid(tk2button(OptionsFrame, text = "OK", 
+                   command = function() onOK()))
+  
+  
 }
 
 # change colors to diffrnet color brewer sets
@@ -778,7 +996,7 @@ BrewerSet <- function(){
 GetColor <- function() {
   STATE[1] <<- 2
   full_file_name <- tclvalue(tkgetOpenFile(filetypes = 
-                                               "{{color.txt Files} {.color.txt}}"))
+                                               "{{color.txt Files} {.color.txt}} {{All files} *}"))
   STATE[1] <<- 0
   if (!nchar(full_file_name)) { ## file select test
     color_file<- brewer.pal(8, as.character(tclvalue(tcl_brewer)))
@@ -869,10 +1087,13 @@ MakeNormFile <- function() {
     if (color_safe == 0 ) {
       color_safe <- 1
     }
-    LIST_DATA$gene_info$common[[file_name]] <<- c(kDotOptions[1], kLineOptions[1], 
-                                                  kListColorSet[color_safe],
-                                                  1, 
-                                                  paste(mynom, mydnom, sep = "/"))
+    for (p in names(LIST_DATA$gene_info)) {
+      LIST_DATA$gene_info[[p]][[file_name]] <<- c(kDotOptions[1], kLineOptions[1], 
+                                                    kListColorSet[color_safe],
+                                                    1, 
+                                                    paste(mynom, mydnom, sep = "/"))
+    }
+    
     sapply(names(LIST_DATA$gene_file), function(x){
       onlist <- get(paste("listbox_" , x, "_on", sep = ""))
       tkinsert(onlist, 'end', file_name)
@@ -1091,16 +1312,20 @@ ApplyMath <- function(list_wide_data_frame, use_col, use_dot, use_line, use_size
   names(use_dot) <- use_nickname
   names(use_line) <- use_nickname
   use_plot_limits <- c(as.integer(tclvalue(tcl_bin_start)), as.integer(tclvalue(tcl_bin_end)))
+  use_y_limits <- c(min(list_long_data_frame$value[list_long_data_frame$bin >= use_plot_limits[1] & 
+                                                     list_long_data_frame$bin <= use_plot_limits[2]]),
+                    max(list_long_data_frame$value[list_long_data_frame$bin >= use_plot_limits[1] & 
+                                                     list_long_data_frame$bin <= use_plot_limits[2]]))
   setTkProgressBar(pb, 75, label = paste(round(75, 0), "Applied Math"))
-  GGplotF(list_long_data_frame, use_col, use_dot, use_line, use_size, use_y_label, 
-          use_x_label, use_plot_breaks, virtical_line_data_frame, 
-          use_plot_breaks_labels, use_plot_limits, legend_space)
+  GGplotF(list_long_data_frame, use_col, use_dot, use_line, use_size, use_y_label,
+          use_x_label, use_plot_breaks, virtical_line_data_frame,
+          use_plot_breaks_labels, use_plot_limits, use_y_limits, legend_space)
 }
 
 # main ggplot function
 GGplotF <- function(list_long_data_frame, use_col, use_dot, use_line, use_size,
                     use_y_label, use_x_label, use_plot_breaks, 
-                    virtical_line_data_frame, use_plot_breaks_labels, use_plot_limits, legend_space) {
+                    virtical_line_data_frame, use_plot_breaks_labels, use_plot_limits, use_y_limits, legend_space) {
   if (tclvalue(tcl_checkbox_log2) == 1) {
     gp <- ggplot(list_long_data_frame, aes(x = bin, y = log2(value), 
                                            color = set, shape = set, linetype = set, size = set))
@@ -1132,32 +1357,28 @@ GGplotF <- function(list_long_data_frame, use_col, use_dot, use_line, use_size,
                                       vjust = .9,   face = 'bold')) +
     theme(legend.title=element_blank(), legend.key = element_rect(size = 5, color = 'white'), 
           legend.key.height=unit(legend_space,"line"),legend.text=element_text(size=9)) +
-    coord_cartesian(xlim = use_plot_limits)
+    coord_cartesian(xlim = use_plot_limits, ylim = use_y_limits)
   setTkProgressBar(pb, 99, label = paste(round(100, 0), "Ready to plot"))
   print(gp)
   close(pb)
 }
 
 # plot cumlitave frequency
-GGplotC <- function(my_list, nick_name){
-  df <- lapply(seq_along(my_list), function(i) 
-                 data.frame(bin = (seq_along(my_list[[1]][,1])), 
-                            set = (as.character(nick_name[i])), 
-                            value = my_list[[1]][i+1], 
-                            stringsAsFactors = FALSE))
-  for(i in seq_along(df)){
-    names(df[[i]]) <- c("bin", "set", "value")
-  }
-  df2 <- bind_rows(df)
-  
+GGplotC <- function(df2, my_xlab, use_col, use_header, legend_space){
   gp <- ggplot(df2, aes(log2(value), color = set)) + 
   stat_ecdf(show.legend = TRUE, size = 1.8) + 
-  xlab(paste(" EI n = " ,length(my_list[[1]][,1]))) + 
+  scale_color_manual(name = "Sample", values = use_col) +
+  xlab(paste(my_xlab, collapse=",  ")) + 
   ylab("Fraction of genes") +  
-  ggtitle("Log2 EI Cumulative plot") +
+  ggtitle(use_header) +
+  theme_bw()+
   theme(legend.title=element_blank()) +
-  theme_bw()
-  
+  theme(axis.title.y = element_text(size =  15)) +
+  theme(axis.title.x = element_text(size =  10, vjust = .5)) +
+  theme(axis.text.x = element_text(size = 12,  angle = -45, hjust = .1, 
+                                   vjust = .9,   face = 'bold')) +
+  theme(legend.title=element_blank(), legend.key = element_rect(size = 5, color = 'white'), 
+        legend.key.height=unit(legend_space,"line"),legend.text=element_text(size=9)) # + coord_cartesian(xlim = c(-4,6))
   print(gp)
 
 }
@@ -1325,13 +1546,6 @@ CompareRatios <- function(){
         outlist[[1]] <<- outlist[[1]][ix,]
       }
     } )
-    nick_name2 <- NULL
-    for(i in nick_name){
-      use_nickname <- strsplit(sub("-", " ", i), " ")[[1]]
-      nick_name2 <- c(nick_name2, paste(use_nickname[1], gsub("(.{15})", "\\1\n", use_nickname[2]), sep = '- \n'))
-    }
-    GGplotC(outlist, nick_name2)
-    
     tkdelete(listbox_gene_ratios_up, 0, 'end')
     if(sum(outlist[[1]][ ,4] > R_num) > 0){
       tkconfigure(listbox_gene_ratios_up, listvariable = tclVar(as.character(outlist[[1]][ , 1][outlist[[1]][ ,4] > R_num])))
@@ -1354,44 +1568,91 @@ CompareRatios <- function(){
 
 # Cumulative Distribution plot
 CumulativeDistribution <- function(){
-  if (as.integer(tksize(listbox_active_cdf)) < 2) {
+  if (as.integer(tksize(listbox_active_cdf)) < 1) {
     return ()
   }
   R_start1_bin <- as.integer(tclvalue(tcl_bin_start1_cdf))
   R_end1_bin <- as.integer(tclvalue(tcl_bin_end1_cdf))
   R_start2_bin <- as.integer(tclvalue(tcl_bin_start2_cdf))
   R_end2_bin <- as.integer(tclvalue(tcl_bin_end2_cdf))
-  lc <- 0
+  R_order <- tclvalue(tcl_acc_dec_cdf)
+  if(sum(R_start1_bin,R_end1_bin) > sum(R_start2_bin,R_end2_bin)){
+    use_header <- "Log2 EI Cumulative plot"
+  } else {
+    use_header <- "Log2 PI Cumulative plot"
+  }
+  use_per_top <- as.numeric(strsplit(tclvalue(tcl_quntile_cdf_top),split = "%")[[1]])/100
+  use_per_bottom <- as.numeric(strsplit(tclvalue(tcl_quntile_cdf_bottom),split = "%")[[1]])/100
+  
+  legend_space <- 1
+ 
   outlist <- NULL
+  use_col <- NULL
   nick_name <- as.character(tkget(listbox_active_cdf, 0, 'end'))
   lapply(nick_name, function(j){
     nick_name2 <- strsplit(sub('-', '\n!',j), '\n!')[[1]]
+    use_col <<- c(use_col, LIST_DATA$gene_info[[nick_name2[1]]][[nick_name2[2]]][3])
     my_ref  <- LIST_DATA$gene_info[[nick_name2[1]]][[nick_name2[2]]][5]
     
     enesg <- data.frame(gene = LIST_DATA$gene_file[[nick_name2[1]]]$use, stringsAsFactors = F)
     
-    df <- inner_join(enesg, LIST_DATA$table_file[[my_ref]], by = 'gene')
+    df <- inner_join(enesg, unique(LIST_DATA$table_file[[my_ref]]), by = 'gene')
     df[is.na(df)] <- 0  # replace NAs with 0
     # find min value /2 to replace if sum = 0s 
     new_min <- min(df[, -1][df[ , -1] > 0]) / 2
     apply_bins <- data.frame(gene = df[ , 1], sum1 = rowSums(df[ , -1][R_start1_bin:R_end1_bin],	na.rm = T),  
                              sum2 = rowSums(df[ , -1][R_start2_bin:R_end2_bin],	na.rm = T), stringsAsFactors = FALSE)
     apply_bins1 <- replace(apply_bins, apply_bins == 0, new_min)
-    lc <<- lc + 1
-    outlist[[lc]] <<- data.frame(gene = apply_bins1[ , 1], sum = apply_bins1$sum1 / apply_bins1$sum2, stringsAsFactors = FALSE)
-    if(lc > 1){
-      outlist[[1]] <<- inner_join(outlist[[1]], outlist[[lc]], by = 'gene')
-      outlist[[1]][ , 4] <<- outlist[[1]][ , 2] / outlist[[1]][ , 3]
-      ix <- sort(outlist[[1]][ , 4], decreasing = T, index = T)$ix
-      outlist[[1]] <<- outlist[[1]][ix,]
-    }
+    
+    outlist[[j]] <<- data.frame(gene = apply_bins1[ , 1], sum = apply_bins1$sum1 / apply_bins1$sum2, stringsAsFactors = FALSE)
   } )
   nick_name2 <- NULL
   for(i in nick_name){
     use_nickname <- strsplit(sub("-", " ", i), " ")[[1]]
-    nick_name2 <- c(nick_name2, paste(use_nickname[1], gsub("(.{15})", "\\1\n", use_nickname[2]), sep = '- \n'))
+    myTCL <- tclvalue(get(paste0("tcl_", use_nickname[1], "file")))
+    current_nickname <- paste(gsub("(.{17})", "\\1\n", myTCL), gsub("(.{17})", "\\1\n", use_nickname[2]), sep = '- \n')
+    nick_name2 <- c(nick_name2, current_nickname)
+    legend_space <<- max(legend_space, (length(strsplit(current_nickname, "\n")[[1]]) - 0.5))
+    my_xlab <- c(my_xlab, paste(myTCL," n = ", nrow(outlist[[i]])))
   }
-  GGplotC(outlist, nick_name2)
+  outlist2 <- NULL
+  df <- lapply(seq_along(outlist), function(i){
+    if(R_order == 'Accend'){
+      ix <- sort(outlist[[i]][,2], decreasing = FALSE, index = T)$ix
+    } else {
+      ix <- sort(outlist[[i]][,2], decreasing = TRUE, index = T)$ix
+    }
+    print(1 + ceiling(length(ix)*use_per_bottom):(length(ix) - ceiling(length(ix)*use_per_top)))
+    ix <- ix[1 + ceiling(length(ix)*use_per_bottom):(length(ix) - ceiling(length(ix)*use_per_top))]
+    outlist2 <<- c(outlist2, outlist[[i]][,1][ix])
+    if(i > 1){
+      outlist2 <<- outlist2[duplicated(outlist2)]
+    }
+    data.frame(bin = (seq_along(outlist[[i]][,1][ix])), 
+               set = (as.character(nick_name2[i])), 
+               value = outlist[[i]][,2][ix],
+               gene = outlist[[i]][,1][ix],
+               stringsAsFactors = FALSE)
+    })
+  for(i in 1:4){
+    gene_list_label <- get(paste("label_cdf_list", i, sep = ""))
+    gene_list <- get(paste("listbox_gene_cdf_list", i, sep = ""))
+    tkdelete(gene_list, 0,"end")
+    tkconfigure(gene_list_label, text = paste(' n = ', (as.integer(tksize(gene_list)))))
+  }  
+  enesg <- data.frame(gene = outlist2, stringsAsFactors = F)
+  
+  for(i in seq_along(df)){
+    names(df[[i]]) <- c("bin", "set", "value", "gene")
+    df[[i]] <- inner_join(df[[i]], enesg, by = 'gene')
+    names(use_col)[i] <- unique(df[[i]]$set)
+    gene_list_label <- get(paste("label_cdf_list", i, sep = ""))
+    gene_list <- get(paste("listbox_gene_cdf_list", i, sep = ""))
+    tkconfigure(gene_list, listvariable = tclVar(paste(df[[i]]$gene)))
+    tkconfigure(gene_list_label, text = paste("File", i, ' n = ', (as.integer(tksize(gene_list)))))
+  }
+  df2 <- bind_rows(df)
+  GGplotC(df2, unique(my_xlab), use_col, use_header, legend_space)
   
 }
 
@@ -1400,6 +1661,7 @@ FindClusters <- function() {
   if (as.integer(tksize(listbox_active_cluster)) < 1) {
     return ()
   }
+  STATE[3] <<- "cluster"
   pb <<- tkProgressBar(title = "Finding clusters, please be patient!!",
                       width = 300)
   setTkProgressBar(pb, 100, label =  "Finding clusters, please be patient!!")
@@ -1514,7 +1776,7 @@ handleColorSel <- function(in_list, list_set) { # lst, list_num){
   
     tkgrid(tklabel(SampleOptionsFrame, text = "Nick name"), 
            padx = c(0, 0), pady = c(10, 10))
-    tkgrid(NickName <- tk2entry(SampleOptionsFrame, width = 70), 
+    tkgrid(NickName <- tk2entry(SampleOptionsFrame, width = kWidth + 40), 
          column = 1, row = 2, pady = c(10, 10))
     tkinsert(NickName, 0, nick_name)
     tkgrid(tklabel(SampleOptionsFrame, text = "line"), padx = c(0, 0))
@@ -1553,16 +1815,15 @@ QuitProgram <- function() {
 # restart, removes all files and lists 
 ClearTableFile <- function() { 
   if(STATE[1] == 0){
-    tt <- tkmessageBox(message = "Do you want to restart?",
-                       icon = "question", type = "yesno", default = "yes")
-    if (tclvalue(tt) == 'yes'){
       DActAll()
       sapply(names(LIST_DATA$gene_file), function(x){
         tkdelete(get(paste("listbox_" , x, "_on", sep = "")), 0, 'end')
         tkdelete(get(paste("listbox_" , x, "_off", sep = "")), 0, 'end')
         tkconfigure(get(paste("label_" , x, "_length", sep = "")), text = 'n = 0')
         if(x != "common"){
-          tkconfigure(get(paste("label_" , x, "_file", sep = "")), text = 'list of table files')
+          myTCL <- get(paste0("tcl_", x, "file"))
+          tclvalue(myTCL) <- x
+          tkconfigure(get(paste("label_" , x, "_file", sep = "")), textvariable = myTCL)
         }
       })  
       tkconfigure(combobox_numerator, values = "numerator")
@@ -1576,7 +1837,6 @@ ClearTableFile <- function() {
       # [c("dot", "line", "color", plot?)] 
       STATE <<- c(0, 'common') # [1] for open option window, [2] for a selected box
     }
-  }
 }
 
 # Change plot axis labels + lines 
@@ -1594,6 +1854,7 @@ PlotLines <- function() {
   tkinsert(entry_line_tick_pos_five, 0, list_plot_ticks[[num]][["loc"]])
   tkdelete(entry_line_tick_label_five, 0, 'end')
   tkinsert(entry_line_tick_label_five, 0, list_plot_ticks[[num]][["name"]])
+  SetComboBoxes(dim(LIST_DATA$table_file[[1]]))
 }
 
 # set up root window ---- 
@@ -1614,6 +1875,10 @@ tkadd(menu_top_file, "command", label = "Quit",
 tkadd(menu_top_file, "command", label = "Restart",
       command = function() ClearTableFile())
 tkadd(menu_top, "cascade", label = "File", menu = menu_top_file) 
+menu_top_options <- tkmenu(menu_top, tearoff = FALSE)
+tkadd(menu_top_options, "command", label = "Options",
+      command = function() GlobalOptions())
+tkadd(menu_top, "cascade", label = "Extra's", menu = menu_top_options) 
 
 # FILE frame for loading files and main controls ----
 
@@ -1638,7 +1903,7 @@ tkgrid(tklabel(frame_notebook_load_file_tab, text = tclvalue(tcl_commonfile)), c
 tkgrid(label_common_length <- tklabel(frame_notebook_load_file_tab, text = "n = "),
        columnspan = 3)
 
-tkgrid(listbox_common_on <- tk2listbox(frame_notebook_load_file_tab, width = 38, height = kHeight, 
+tkgrid(listbox_common_on <- tk2listbox(frame_notebook_load_file_tab, width = kWidth + 8, height = kHeight, 
                                        autoscroll = "none", tip = 
                                          "Double click on a file name to open options for that entry"),
        columnspan = 3)
@@ -1656,7 +1921,7 @@ tkgrid(tk2button(frame_notebook_load_file_tab, text = "  <<Switch>>  ", command 
     MoveAllToOtherEntry(listbox_common_on, listbox_common_off, "off")), 
   sticky = 'we', padx = c(2,2))
 
-tkgrid(listbox_common_off <- tk2listbox(frame_notebook_load_file_tab, width = 38, height = kHeight, 
+tkgrid(listbox_common_off <- tk2listbox(frame_notebook_load_file_tab, width = kWidth + 8, height = kHeight, 
                                         autoscroll = "none", tip = 
                                           "files in this list wont show up on plot"),
        columnspan = 3)
@@ -1671,7 +1936,7 @@ tkgrid(tk2button(frame_notebook_load_file_tab, text = " Load table file ",
        column = 0)
 
 tkgrid(tk2button(frame_notebook_load_file_tab, text = " Intersect list ", command = function()
-  IntersectGeneLists(LIST_DATA$gene_file$common$use, tclvalue(tcl_tablefile))), column = 1, row = 7)
+  IntersectGeneLists(LIST_DATA$gene_file$common$use, tclvalue(tcl_commonfile))), column = 1, row = 7)
 
 tkgrid(tk2button(frame_notebook_load_file_tab, text = " Remove file",
                 command =  function() RemoveFile()), row = 7, 
@@ -1716,7 +1981,7 @@ checkbox_relative_gene_frequency <- tkcheckbutton(tab_plot_options_frame,
                                                   text = "Rel Gene  " )
 tkgrid(checkbox_relative_gene_frequency, column = 2 , row = 1, pady = c(10,10))
 
-tkgrid(tklabel(tab_plot_options_frame, text = "Bins to plot"), column = 0 , row = 2, pady = c(10,10))
+tkgrid(tklabel(tab_plot_options_frame, text = "Zoom into bins"), column = 0 , row = 2, pady = c(10,10))
 
 combobox_bin_start <- tk2combobox(tab_plot_options_frame, 
                                   textvariable = tcl_bin_start,
@@ -1823,14 +2088,14 @@ tkgrid(tklabel(tab_plot_options_line_tick_frame, text = "More Bin labels"),
 tkgrid(tklabel(tab_plot_options_line_tick_frame, text = 'Pos'), padx = c(5, 0), 
        column = 0, row = 12, sticky = "w")
 entry_line_tick_pos_five <- tk2entry(tab_plot_options_line_tick_frame, 
-                                     width = 32,
+                                     width = kWidth + 2,
                                      textvariable = tcl_pos_plot_ticks)
 tkgrid(entry_line_tick_pos_five, column = 1, row = 12, padx = c(0, 0), 
        columnspan = 5, sticky = "w")
 tkgrid(tklabel(tab_plot_options_line_tick_frame, text = 'label'), 
        padx = c(5, 0), column = 0, row = 13, sticky = "w")
 entry_line_tick_label_five <- tk2entry(tab_plot_options_line_tick_frame, 
-                                    width = 32, 
+                                    width = kWidth + 2, 
                                     textvariable = tcl_label_plot_ticks)
 tkgrid(entry_line_tick_label_five, column = 1, row = 13, padx = c(0, 0), 
        columnspan = 5)
@@ -1880,7 +2145,7 @@ tkgrid(notebook_file, column = 0, row = 0, sticky = 'nsew')
 tkgrid(frame_plot_button <- tkframe(left_frame, relief = "groove", bg = "blue", borderwidth = 5), 
        columnspan = 4, column = 0, row = 1, sticky = 'nsew', pady = c(10,10), padx = c(20,20) ) # raised, sunken, flat, ridge, solid, and groove
 tkgrid(plot_button <- tk2button(frame_plot_button, text = '  Plot  ', 
-                               width = 35, command = function() MakeDataFrame()), sticky = 'ew', padx = c(5,5)) 
+                               width = kWidth + 5, command = function() MakeDataFrame()), sticky = 'ew', padx = c(5,5)) 
 
 # LIST frame for loading gene lists and controls ----
 
@@ -1902,7 +2167,7 @@ tkgrid(label_gene1_file, columnspan = 3)
 label_gene1_length <- tklabel(frame_gene1_tab, text = "n = ")
 tkgrid(label_gene1_length, columnspan = 3)
 
-listbox_gene1_on <- tk2listbox(frame_gene1_tab, width = 38, height = kHeight, autoscroll = 'none',
+listbox_gene1_on <- tk2listbox(frame_gene1_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none',
                                tip = "load a txt file of gene lists to plot sub set")
 tkgrid(listbox_gene1_on, columnspan = 3)
 tkbind(listbox_gene1_on, "<Double-ButtonPress-1>", function() handleColorSel(listbox_gene1_on, 'gene1'))
@@ -1914,7 +2179,7 @@ tkgrid(tk2button(frame_gene1_tab, text = "<<Switch>>", command = function()
     MoveAllToOtherEntry(listbox_gene1_on, listbox_gene1_off, "on", file_name = "gene1")), 
   tk2button(frame_gene1_tab, text = "<<All Off>>", command = function() 
     MoveAllToOtherEntry(listbox_gene1_on, listbox_gene1_off, "off", file_name = "gene1")), sticky = 'we', padx = c(2,2))
-listbox_gene1_off <- tk2listbox(frame_gene1_tab, width = 38, height = kHeight, autoscroll = 'none', 
+listbox_gene1_off <- tk2listbox(frame_gene1_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none', 
                                 tip = "files in this list wont show up on plot")
 tkgrid(listbox_gene1_off, columnspan = 3)
 tkbind(listbox_gene1_off, "<Double-ButtonPress-1>", function() handleColorSel(listbox_gene1_off, 'gene1'))
@@ -1942,7 +2207,7 @@ tkgrid(label_gene2_file, columnspan = 3)
 label_gene2_length <- tklabel(frame_gene2_tab, text = "n = ")
 tkgrid(label_gene2_length, columnspan = 3)
 
-listbox_gene2_on <- tk2listbox(frame_gene2_tab, width = 38, height = kHeight, autoscroll = 'none',
+listbox_gene2_on <- tk2listbox(frame_gene2_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none',
                                tip = "load a txt file of gene lists to plot sub set")
 tkgrid(listbox_gene2_on, columnspan = 3)
 tkbind(listbox_gene2_on, "<Double-ButtonPress-1>", function() handleColorSel(listbox_gene2_on, 'gene2'))
@@ -1954,7 +2219,7 @@ tkgrid(tk2button(frame_gene2_tab, text = "<<Switch>>", command = function()
     MoveAllToOtherEntry(listbox_gene2_on, listbox_gene2_off, "on", file_name = "gene2")), 
   tk2button(frame_gene2_tab, text = "<<All Off>>", command = function() 
     MoveAllToOtherEntry(listbox_gene2_on, listbox_gene2_off, "off", file_name = "gene2")), sticky = 'we', padx = c(2,2))
-listbox_gene2_off <- tk2listbox(frame_gene2_tab, width = 38, height = kHeight, autoscroll = 'none', 
+listbox_gene2_off <- tk2listbox(frame_gene2_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none', 
                                 tip = "files in this list wont show up on plot")
 tkgrid(listbox_gene2_off, columnspan = 3)
 tkbind(listbox_gene2_off, "<Double-ButtonPress-1>", function() handleColorSel(listbox_gene2_off, 'gene2'))
@@ -1982,7 +2247,7 @@ tkgrid(label_gene3_file, columnspan = 3)
 label_gene3_length <- tklabel(frame_gene3_tab, text = "n = ")
 tkgrid(label_gene3_length, columnspan = 3)
 
-listbox_gene3_on <- tk2listbox(frame_gene3_tab, width = 38, height = kHeight, autoscroll = 'none',
+listbox_gene3_on <- tk2listbox(frame_gene3_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none',
                                tip = "load a txt file of gene lists to plot sub set")
 tkgrid(listbox_gene3_on, columnspan = 3)
 tkbind(listbox_gene3_on, "<Double-ButtonPress-1>", function() handleColorSel(listbox_gene3_on, 'gene3'))
@@ -1994,7 +2259,7 @@ tkgrid(tk2button(frame_gene3_tab, text = "<<Switch>>", command = function()
     MoveAllToOtherEntry(listbox_gene3_on, listbox_gene3_off, "on", file_name = "gene3")), 
   tk2button(frame_gene3_tab, text = "<<All Off>>", command = function() 
     MoveAllToOtherEntry(listbox_gene3_on, listbox_gene3_off, "off", file_name = "gene3")), sticky = 'we', padx = c(2,2))
-listbox_gene3_off <- tk2listbox(frame_gene3_tab, width = 38, height = kHeight, autoscroll = 'none', 
+listbox_gene3_off <- tk2listbox(frame_gene3_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none', 
                                 tip = "files in this list wont show up on plot")
 tkgrid(listbox_gene3_off, columnspan = 3)
 tkbind(listbox_gene3_off, "<Double-ButtonPress-1>", function() handleColorSel(listbox_gene3_off, 'gene3'))
@@ -2022,7 +2287,7 @@ tkgrid(label_gene4_file, columnspan = 3)
 label_gene4_length <- tklabel(frame_gene4_tab, text = "n = ")
 tkgrid(label_gene4_length, columnspan = 3)
 
-listbox_gene4_on <- tk2listbox(frame_gene4_tab, width = 38, height = kHeight, autoscroll = 'none',
+listbox_gene4_on <- tk2listbox(frame_gene4_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none',
                                tip = "load a txt file of gene lists to plot sub set")
 tkgrid(listbox_gene4_on, columnspan = 3)
 tkbind(listbox_gene4_on, "<Double-ButtonPress-1>", function() handleColorSel(listbox_gene4_on, 'gene4'))
@@ -2034,7 +2299,7 @@ tkgrid(tk2button(frame_gene4_tab, text = "<<Switch>>", command = function()
     MoveAllToOtherEntry(listbox_gene4_on, listbox_gene4_off, "on", file_name = "gene4")), 
   tk2button(frame_gene4_tab, text = "<<All Off>>", command = function() 
     MoveAllToOtherEntry(listbox_gene4_on, listbox_gene4_off, "off", file_name = "gene4")), sticky = 'we', padx = c(2,2))
-listbox_gene4_off <- tk2listbox(frame_gene4_tab, width = 38, height = kHeight, autoscroll = 'none', 
+listbox_gene4_off <- tk2listbox(frame_gene4_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none', 
                                 tip = "files in this list wont show up on plot")
 tkgrid(listbox_gene4_off, columnspan = 3)
 tkbind(listbox_gene4_off, "<Double-ButtonPress-1>", function() handleColorSel(listbox_gene4_off, 'gene4'))
@@ -2062,7 +2327,7 @@ tkgrid(label_tool_file, columnspan = 3)
 label_tool_length <- tklabel(frame_tool_tab, text = "n = ")
 tkgrid(label_tool_length, columnspan = 3)
 
-listbox_tool_on <- tk2listbox(frame_tool_tab, width = 38, height = kHeight, autoscroll = 'none',
+listbox_tool_on <- tk2listbox(frame_tool_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none',
                                tip = "load a txt file of gene lists to plot sub set")
 tkgrid(listbox_tool_on, columnspan = 3)
 tkbind(listbox_tool_on, "<Double-ButtonPress-1>", function() handleColorSel(listbox_tool_on, 'tool'))
@@ -2074,7 +2339,7 @@ tkgrid(tk2button(frame_tool_tab, text = "<<Switch>>", command = function()
     MoveAllToOtherEntry(listbox_tool_on, listbox_tool_off, "on", file_name = "tool")), 
   tk2button(frame_tool_tab, text = "<<All Off>>", command = function() 
     MoveAllToOtherEntry(listbox_tool_on, listbox_tool_off, "off", file_name = "tool")), sticky = 'we', padx = c(2,2))
-listbox_tool_off <- tk2listbox(frame_tool_tab, width = 38, height = kHeight, autoscroll = 'none', 
+listbox_tool_off <- tk2listbox(frame_tool_tab, width = kWidth + 8, height = kHeight, autoscroll = 'none', 
                                 tip = "files in this list wont show up on plot")
 tkgrid(listbox_tool_off, columnspan = 3)
 tkbind(listbox_tool_off, "<Double-ButtonPress-1>", function() handleColorSel(listbox_tool_off, 'tool'))
@@ -2124,7 +2389,7 @@ frame_sort_tab <- tkframe(notebook_sort_tab,
 label_active_sort <- tklabel(frame_sort_tab, text = "Active table files")
 tkgrid(label_active_sort, columnspan = 3)
 
-listbox_active_sort <- tk2listbox(frame_sort_tab, height = kHeight + 1, width = 38, autoscroll = 'none',
+listbox_active_sort <- tk2listbox(frame_sort_tab, height = kHeight + 1, width = kWidth + 8, autoscroll = 'none',
                                   tip = "activate file(s) to use tool")
 tkgrid(listbox_active_sort, columnspan = 3)
 
@@ -2188,7 +2453,7 @@ tkgrid(frame_sort_tab_buttons, columnspan = 4, sticky = 'nswe')
 label_active_sort_length <- tklabel(frame_sort_tab, text = "n = 0")
 tkgrid(label_active_sort_length, columnspan = 3)
 
-listbox_active_gene_sort <- tk2listbox(frame_sort_tab, height = kHeight + 7, width = 38, 
+listbox_active_gene_sort <- tk2listbox(frame_sort_tab, height = kHeight + 7, width = kWidth + 8, 
                                   selectmode = "extended", autoscroll = 'none')
 tkgrid(listbox_active_gene_sort, columnspan = 3, pady = c(5,5))
 
@@ -2203,7 +2468,7 @@ tkgrid(tk2button(frame_sort_tab, text = "Intersect list", command = function()
                      "sort tool"), width = 15), column = 0, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_sort_tab, text = "Save list", command = function()
-  SaveGenelist(listbox_active_gene_sort), width = 15), column = 1, row = 8, pady = c(5,5))
+  SaveGenelist(listbox_active_gene_sort, listbox_active_sort, "sort"), width = 15), column = 1, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_sort_tab, text = "Search list", command = function()
   FindGene(entry_sort_search, listbox_active_gene_sort), width = 15), column = 0, row = 9, pady = c(10,10))
@@ -2224,7 +2489,7 @@ frame_region_tab <- tkframe(notebook_region_tab,
 label_active_region <- tklabel(frame_region_tab, text = "No Active table files")
 tkgrid(label_active_region, columnspan = 3)
 
-listbox_active_region <- tk2listbox(frame_region_tab, height = 2, width = 40, 
+listbox_active_region <- tk2listbox(frame_region_tab, height = 2, width = kWidth + 10, 
                                    tip = "activate 2 files to use tool",  scroll = 'x', 
                                    autoscroll = 'none')
 tkgrid(listbox_active_region, columnspan = 3)
@@ -2289,7 +2554,7 @@ frame_region_notbook_up <- tkframe(notebook_region_up_tab)
 tkgrid(label_region_up <- tklabel(frame_region_notbook_up, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_region_up <- tk2listbox(frame_region_notbook_up, height = kHeight + 9, width = 38,
+tkgrid(listbox_gene_region_up <- tk2listbox(frame_region_notbook_up, height = kHeight + 9, width = kWidth + 8,
                                            selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_region_notbook_up)
@@ -2302,7 +2567,7 @@ frame_region_notbook_down <- tkframe(notebook_region_down_tab)
 tkgrid(label_region_down <- tklabel(frame_region_notbook_down, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_region_down <- tk2listbox(frame_region_notbook_down, height = kHeight + 9, width = 38,
+tkgrid(listbox_gene_region_down <- tk2listbox(frame_region_notbook_down, height = kHeight + 9, width = kWidth + 8,
                                            selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_region_notbook_down)
@@ -2314,7 +2579,7 @@ frame_region_notbook_between <- tkframe(notebook_region_between_tab)
 tkgrid(label_region_between <- tklabel(frame_region_notbook_between, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_region_between <- tk2listbox(frame_region_notbook_between, height = kHeight + 9 , width = 38, 
+tkgrid(listbox_gene_region_between <- tk2listbox(frame_region_notbook_between, height = kHeight + 9 , width = kWidth + 8, 
                                        selectmode = "extended", autoscroll = 'none'), 
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_region_notbook_between)
@@ -2331,7 +2596,7 @@ tkgrid(tk2button(frame_region_tab, text = "Intersect list", command = function()
   width = 15), column = 0, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_region_tab, text = "Save list", command = function()
-  SaveGenelist("region"), width = 15), column = 1, row = 8, pady = c(5,5))
+  SaveGenelist("region", listbox_active_region, "region"), width = 15), column = 1, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_region_tab, text = "Search list", command = function()
   FindGene(entry_region_search, "region"), width = 15), column = 0, row = 9, pady = c(10,10))
@@ -2352,7 +2617,7 @@ frame_ratios_tab <- tkframe(notebook_ratios_tab,
 label_active_ratios <- tklabel(frame_ratios_tab, text = "No Active table files")
 tkgrid(label_active_ratios, columnspan = 3)
 
-listbox_active_ratios <- tk2listbox(frame_ratios_tab, height = 2, width = 40, scroll = 'x',
+listbox_active_ratios <- tk2listbox(frame_ratios_tab, height = 2, width = kWidth + 10, scroll = 'x',
                                     autoscroll = 'none')
 tkgrid(listbox_active_ratios, columnspan = 3)
 
@@ -2439,7 +2704,7 @@ frame_ratios_notbook_up <- tkframe(notebook_ratios_up_tab)
 tkgrid(label_ratios_up <- tklabel(frame_ratios_notbook_up, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_ratios_up <- tk2listbox(frame_ratios_notbook_up, height = kHeight + 7, width = 38,
+tkgrid(listbox_gene_ratios_up <- tk2listbox(frame_ratios_notbook_up, height = kHeight + 7, width = kWidth + 8,
                                            selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_ratios_notbook_up)
@@ -2452,7 +2717,7 @@ frame_ratios_notbook_down <- tkframe(notebook_ratios_down_tab)
 tkgrid(label_ratios_down <- tklabel(frame_ratios_notbook_down, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_ratios_down <- tk2listbox(frame_ratios_notbook_down, height = kHeight + 7, width = 38,
+tkgrid(listbox_gene_ratios_down <- tk2listbox(frame_ratios_notbook_down, height = kHeight + 7, width = kWidth + 8,
                                              selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_ratios_notbook_down)
@@ -2464,7 +2729,7 @@ frame_ratios_notbook_between <- tkframe(notebook_ratios_between_tab)
 tkgrid(label_ratios_between <- tklabel(frame_ratios_notbook_between, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_ratios_between <- tk2listbox(frame_ratios_notbook_between, height = kHeight + 7, width = 38, 
+tkgrid(listbox_gene_ratios_between <- tk2listbox(frame_ratios_notbook_between, height = kHeight + 7, width = kWidth + 8, 
                                                 selectmode = "extended", autoscroll = 'none'), 
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_ratios_notbook_between)
@@ -2481,7 +2746,7 @@ tkgrid(tk2button(frame_ratios_tab, text = "Intersect list", command = function()
   width = 15), column = 0, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_ratios_tab, text = "Save list", command = function()
-  SaveGenelist("ratios"), width = 15), column = 1, row = 8, pady = c(5,5))
+  SaveGenelist("ratios", listbox_active_ratios, "ratios"), width = 15), column = 1, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_ratios_tab, text = "Search list", command = function()
   FindGene(entry_ratios_search, "ratios"), width = 15), column = 0, row = 9, pady = c(10,10))
@@ -2502,7 +2767,7 @@ frame_cluster_tab <- tkframe(notebook_cluster_tab,
 label_active_cluster <- tklabel(frame_cluster_tab, text = "No Active table files")
 tkgrid(label_active_cluster, columnspan = 3)
 
-listbox_active_cluster <- tk2listbox(frame_cluster_tab, height = 1, width = 40,
+listbox_active_cluster <- tk2listbox(frame_cluster_tab, height = 1, width = kWidth + 10,
                                      scroll = 'x', autoscroll = 'none')
 tkgrid(listbox_active_cluster, columnspan = 3)
 
@@ -2552,6 +2817,10 @@ tkgrid(combobox_bin_cluster_num, padx = c(0, 0),
 tkbind(combobox_bin_cluster_num, "<<ComboboxSelected>>", function() ClusterNumList(LIST_DATA$clust))
 tkgrid(frame_cluster_tab_buttons, columnspan = 4, sticky = 'nsew')
 
+tkgrid(tk2button(frame_cluster_tab_buttons, text = "   Quantiles   ", 
+                 command =  function() FindQuantile()), 
+       column = 0, row = 5, columnspan = 4, pady = c(5, 5))
+
 notebook_cluster <- tk2notebook(frame_cluster_tab, 
                               tabs = c("list 1", "list 2",
                                        "list 3", "list 4"))
@@ -2565,7 +2834,7 @@ frame_cluster_notbook_list1 <- tkframe(notebook_cluster_list1_tab)
 tkgrid(label_cluster_list1 <- tklabel(frame_cluster_notbook_list1, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_cluster_list1 <- tk2listbox(frame_cluster_notbook_list1, height = kHeight + 12, width = 38,
+tkgrid(listbox_gene_cluster_list1 <- tk2listbox(frame_cluster_notbook_list1, height = kHeight + 10, width = kWidth + 8,
                                            selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_cluster_notbook_list1)
@@ -2578,7 +2847,7 @@ frame_cluster_notbook_list2 <- tkframe(notebook_cluster_list2_tab)
 tkgrid(label_cluster_list2 <- tklabel(frame_cluster_notbook_list2, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_cluster_list2 <- tk2listbox(frame_cluster_notbook_list2, height = kHeight + 12, width = 38,
+tkgrid(listbox_gene_cluster_list2 <- tk2listbox(frame_cluster_notbook_list2, height = kHeight + 10, width = kWidth + 8,
                                              selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_cluster_notbook_list2)
@@ -2590,7 +2859,7 @@ frame_cluster_notbook_list3 <- tkframe(notebook_cluster_list3_tab)
 tkgrid(label_cluster_list3 <- tklabel(frame_cluster_notbook_list3, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_cluster_list3 <- tk2listbox(frame_cluster_notbook_list3, height = kHeight + 12, width = 38, 
+tkgrid(listbox_gene_cluster_list3 <- tk2listbox(frame_cluster_notbook_list3, height = kHeight + 10, width = kWidth + 8, 
                                                 selectmode = "extended", autoscroll = 'none'), 
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_cluster_notbook_list3)
@@ -2602,7 +2871,7 @@ frame_cluster_notbook_list4 <- tkframe(notebook_cluster_list4_tab)
 tkgrid(label_cluster_list4 <- tklabel(frame_cluster_notbook_list4, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_cluster_list4 <- tk2listbox(frame_cluster_notbook_list4, height = kHeight + 12, width = 38, 
+tkgrid(listbox_gene_cluster_list4 <- tk2listbox(frame_cluster_notbook_list4, height = kHeight + 10, width = kWidth + 8, 
                                                 selectmode = "extended", autoscroll = 'none'), 
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_cluster_notbook_list4)
@@ -2619,7 +2888,7 @@ tkgrid(tk2button(frame_cluster_tab, text = "Intersect list", command = function(
   width = 15), column = 0, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_cluster_tab, text = "Save list", command = function()
-  SaveGenelist("cluster"), width = 15), column = 1, row = 8, pady = c(5,5))
+  SaveGenelist("cluster", listbox_active_cluster, STATE[3]), width = 15), column = 1, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_cluster_tab, text = "Search list", command = function()
   FindGene(entry_cluster_search, "cluster"), width = 15), column = 0, row = 9, pady = c(10,10))
@@ -2640,7 +2909,7 @@ frame_intersect_tab <- tkframe(notebook_intersect_tab,
 label_active_intersect <- tklabel(frame_intersect_tab, text = "Active table files")
 tkgrid(label_active_intersect, columnspan = 3)
 
-listbox_active_intersect <- tk2listbox(frame_intersect_tab, height = kHeight + 1, width = 38, autoscroll = 'none',
+listbox_active_intersect <- tk2listbox(frame_intersect_tab, height = kHeight + 1, width = kWidth + 8, autoscroll = 'none',
                                   tip = "activate file(s) to use tool")
 tkgrid(listbox_active_intersect, columnspan = 3)
 
@@ -2671,7 +2940,7 @@ frame_intersect_inclusive <- tkframe(notebook_intersect_inclusive_tab)
 tkgrid(label_intersect_inclusive <- tklabel(frame_intersect_inclusive, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_intersect_inclusive <- tk2listbox(frame_intersect_inclusive, height = kHeight + 10, width = 38,
+tkgrid(listbox_intersect_inclusive <- tk2listbox(frame_intersect_inclusive, height = kHeight + 10, width = kWidth + 8,
                                                 selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_intersect_inclusive)
@@ -2684,7 +2953,7 @@ frame_intersect_exclusive <- tkframe(notebook_intersect_exclusive_tab)
 tkgrid(label_intersect_exclusive <- tklabel(frame_intersect_exclusive, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_intersect_exclusive <- tk2listbox(frame_intersect_exclusive, height = kHeight + 10, width = 38,
+tkgrid(listbox_intersect_exclusive <- tk2listbox(frame_intersect_exclusive, height = kHeight + 10, width = kWidth + 8,
                                                  selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_intersect_exclusive)
@@ -2697,7 +2966,7 @@ frame_intersect_combind <- tkframe(notebook_intersect_combind_tab)
 tkgrid(label_intersect_combind <- tklabel(frame_intersect_combind, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_intersect_combind <- tk2listbox(frame_intersect_combind, height = kHeight + 10, width = 38,
+tkgrid(listbox_intersect_combind <- tk2listbox(frame_intersect_combind, height = kHeight + 10, width = kWidth + 8,
                                                  selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
 tkgrid(frame_intersect_combind)
@@ -2709,7 +2978,7 @@ tkgrid(tk2button(frame_intersect_tab, text = "plot selected", command = function
   SelectGeneListPlotHelper("intersect"), width = 15), column = 1, row = 7, pady = c(5,5))
 
 tkgrid(tk2button(frame_intersect_tab, text = "Save list", command = function()
-  SaveGenelist("intersect"), width = 15), column = 1, row = 8, pady = c(5,5))
+  SaveGenelist("intersect", listbox_active_intersect, "intersect"), width = 15), column = 1, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_intersect_tab, text = "Search list", command = function()
   FindGene(entry_intersect_search, "intersect"), width = 15), column = 0, row = 9, pady = c(10,10))
@@ -2730,23 +2999,19 @@ frame_cdf_tab <- tkframe(notebook_cdf_tab,
 label_active_cdf <- tklabel(frame_cdf_tab, text = "No Active table files")
 tkgrid(label_active_cdf, columnspan = 3)
 
-listbox_active_cdf <- tk2listbox(frame_cdf_tab, height = kHeight + 1, width = 40, scroll = 'x',
+listbox_active_cdf <- tk2listbox(frame_cdf_tab, height = 4, width = kWidth + 8, 
+                                 tip = "activate 4 files to use tool",  scroll = 'x',
                                     autoscroll = 'none')
 tkgrid(listbox_active_cdf, columnspan = 3)
 
 tkgrid(tk2button(frame_cdf_tab, text = "Activate file(s)", command = function()
-  ActLst(listbox_active_cdf, 0)), tk2button(frame_cdf_tab, text = "Clear Tool", command = function()
-    DActLst(listbox_active_cdf)))
+  ActLst(listbox_active_cdf, 5)), tk2button(frame_cdf_tab, text = "Clear Tool", command = function()
+    DActLst(listbox_active_cdf, NULL, NULL)))
 
 frame_cdf_tab_buttons <- tkframe(frame_cdf_tab, relief = 'ridge',
                                     borderwidth = 5) 
 
 tkgrid(tklabel(frame_cdf_tab_buttons, text = "cdf tools"), columnspan = 4, padx = c(50, 0)) 
-
-tkgrid(tklabel(frame_cdf_tab_buttons,
-               text = "CDF"), sticky = "w", 
-       columnspan = 2, column = 0, row = 1, padx = c(50, 0)) 
-
 
 tkgrid(tklabel(frame_cdf_tab_buttons, text = "bins"),
        padx = c(50, 0), column = 0, row = 3, sticky ="e")
@@ -2792,9 +3057,85 @@ tkbind(combobox_bin_end2_cdf, "<<ComboboxSelected>>", function()
 
 tkgrid(tk2button(frame_cdf_tab_buttons, text = "   cdf plot  ", 
                  command =  function() CumulativeDistribution()), 
-       column = 0, row = 5, columnspan = 4, pady = c(10, 10), padx = c(50, 0))
+       column = 0, row = 5, columnspan = 2, pady = c(5, 5), padx = c(50, 0))
+
+tkgrid(tk2combobox(frame_cdf_tab_buttons,
+                   values =  kAccDec, 
+                   textvariable = tcl_acc_dec_cdf, 
+                   state = "readonly", width = 7), sticky = "w", 
+       columnspan = 3, column = 2, row = 5, padx = c(0, 5), pady = c(5, 5))
+
+tkgrid(tklabel(frame_cdf_tab_buttons, text = "rm low hi"),
+       padx = c(50, 0), column = 0, row = 6, sticky ="w")
+
+tkgrid(tk2combobox(frame_cdf_tab_buttons,
+                   values =  kQuntile, 
+                   textvariable = tcl_quntile_cdf_bottom, 
+                   state = "readonly", width = 4), sticky = "w", 
+       column = 1, row = 6, padx = c(0, 5), pady = c(5, 5))
+
+tkgrid(tk2combobox(frame_cdf_tab_buttons,
+                   values =  kQuntile, 
+                   textvariable = tcl_quntile_cdf_top, 
+                   state = "readonly", width = 4), sticky = "w", 
+       columnspan = 3, column = 2, row = 6, padx = c(0, 5), pady = c(5, 5))
 
 tkgrid(frame_cdf_tab_buttons, columnspan = 4, sticky = 'nsew')
+
+notebook_cdf <- tk2notebook(frame_cdf_tab, 
+                                tabs = c("list 1", "list 2",
+                                         "list 3", "list 4"))
+tkgrid(notebook_cdf, columnspan = 4)
+
+notebook_cdf_list1_tab <- tk2notetab(notebook_cdf, "list 1")
+
+
+frame_cdf_notbook_list1 <- tkframe(notebook_cdf_list1_tab)
+
+tkgrid(label_cdf_list1 <- tklabel(frame_cdf_notbook_list1, text = "n = "), 
+       columnspan = 3)
+
+tkgrid(listbox_gene_cdf_list1 <- tk2listbox(frame_cdf_notbook_list1, height = kHeight + 7, width = kWidth + 8,
+                                                selectmode = "extended", autoscroll = 'none'),
+       columnspan = 3, pady = c(5,5))
+tkgrid(frame_cdf_notbook_list1)
+
+notebook_cdf_list2_tab <- tk2notetab(notebook_cdf, "list 2")
+
+
+frame_cdf_notbook_list2 <- tkframe(notebook_cdf_list2_tab)
+
+tkgrid(label_cdf_list2 <- tklabel(frame_cdf_notbook_list2, text = "n = "), 
+       columnspan = 3)
+
+tkgrid(listbox_gene_cdf_list2 <- tk2listbox(frame_cdf_notbook_list2, height = kHeight + 7, width = kWidth + 8,
+                                                selectmode = "extended", autoscroll = 'none'),
+       columnspan = 3, pady = c(5,5))
+tkgrid(frame_cdf_notbook_list2)
+
+notebook_cdf_list3_tab <- tk2notetab(notebook_cdf, "list 3")
+
+frame_cdf_notbook_list3 <- tkframe(notebook_cdf_list3_tab)
+
+tkgrid(label_cdf_list3 <- tklabel(frame_cdf_notbook_list3, text = "n = "), 
+       columnspan = 3)
+
+tkgrid(listbox_gene_cdf_list3 <- tk2listbox(frame_cdf_notbook_list3, height = kHeight + 7, width = kWidth + 8, 
+                                                selectmode = "extended", autoscroll = 'none'), 
+       columnspan = 3, pady = c(5,5))
+tkgrid(frame_cdf_notbook_list3)
+
+notebook_cdf_list4_tab <- tk2notetab(notebook_cdf, "list 4")
+
+frame_cdf_notbook_list4 <- tkframe(notebook_cdf_list4_tab)
+
+tkgrid(label_cdf_list4 <- tklabel(frame_cdf_notbook_list4, text = "n = "), 
+       columnspan = 3)
+
+tkgrid(listbox_gene_cdf_list4 <- tk2listbox(frame_cdf_notbook_list4, height = kHeight + 7, width = kWidth + 8, 
+                                                selectmode = "extended", autoscroll = 'none'), 
+       columnspan = 3, pady = c(5,5))
+tkgrid(frame_cdf_notbook_list4)
 
 tkgrid(tk2button(frame_cdf_tab, text = "plot list", command = function()
   GeneListPlotHelper("cdf"), width = 15), column = 0, row = 7, pady = c(5,5))
@@ -2804,14 +3145,14 @@ tkgrid(tk2button(frame_cdf_tab, text = "plot selected", command = function()
 
 tkgrid(tk2button(frame_cdf_tab, text = "Intersect list", command = function()
   IntersectGeneLists(as.character(tkget(ListBoxSelectHelper("cdf"), 0, 'end')),
-                     paste("cdf-", tk2notetab.text(notebook_cdf))),
-  width = 15), column = 0, row = 8, pady = c(5,5))
+                     paste("cdf-", tk2notetab.text(notebook_cluster)))
+  , width = 15), column = 0, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_cdf_tab, text = "Save list", command = function()
-  SaveGenelist("cdf"), width = 15), column = 1, row = 8, pady = c(5,5))
+  SaveGenelist('cdf', listbox_active_cdf, "cdf"), width = 15), column = 1, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_cdf_tab, text = "Search list", command = function()
-  FindGene(entry_cdf_search, "cdf"), width = 15), column = 0, row = 9, pady = c(10,10))
+  FindGene(entry_cdf_search, 'cdf'), width = 15), column = 0, row = 9, pady = c(10,10))
 
 tkgrid(entry_cdf_search <- tk2entry(frame_cdf_tab, tip = "Enter gene name to search", width = 20), 
        column = 1, row = 9, pady = c(10,10))
@@ -2832,5 +3173,5 @@ tkgrid.rowconfigure(root,frame_tool,weight=1)
 try(tk2theme("keramik"), silent = TRUE)
 tkraise(root)
 tkbind(root,"<FocusIn>", function() OpenWindowControl())
-# }
-# expandTk()
+}
+expandTk()
