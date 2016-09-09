@@ -1,6 +1,6 @@
 # Created by Benjamin Erickson  ----
 
-expandTk <- function(){
+# expandTk <- function(){
 version_num <- 'Ben Tools v.07.b'
 # For plotting Bentley lab table files and generating gene list
 
@@ -37,10 +37,10 @@ kListColorSet <- brewer.pal(8, kBrewerList[3])
 kMathOptions <- c("mean", "sum", "median")
 kTopBottomOptions <- c("Top%", "Bottom%") 
 kInOutOptions <- c("inclusive", "exclusive") 
-kTopBottomNum <- c(1, seq(5, 100, by = 5))
+kTopBottomNum <- c(1, 2, seq(5, 95, by = 5), 99, 100)
 kAccDec <- c("Accend", "Deccend")
 kQuntile <- c("0%", "1%", paste0(seq(5, 45, 5),"%"))
-kFoldList <- round(seq(1, 4, by = 0.2),digits=4)
+kFoldList <- round(c(1, seq(1.1, 2, by = 0.2), 2, seq(2.1, 4, by = 0.2), 4), digits = 4)
 # plot lines and ticks with labels
 list_plot_lines <- list("543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
                         "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5),
@@ -79,7 +79,7 @@ tcl_toolfile <- tclVar("tool")
 tcl_line_option <- tclVar(kLineOptions[1])
 tcl_dot_option <- tclVar(kDotOptions[1])
 tcl_top_bottom_option <- tclVar(kTopBottomOptions[1])
-tcl_top_bottom_num <- tclVar(kTopBottomNum[6])
+tcl_top_bottom_num <- tclVar(kTopBottomNum[7])
 tcl_acc_dec <- tclVar(kAccDec[2])
 tcl_acc_dec_cdf <- tclVar(kAccDec[2])
 tcl_quntile_cdf_bottom <- tclVar(kQuntile[1])
@@ -123,7 +123,7 @@ tcl_checkbox_relative_gene_frequency <- tclVar(0)
 tcl_checkbox_log2 <- tclVar(0)
 tcl_checkbox_comment <- tclVar(0) # 1 = don't show save comment popup
 tcl_checkbox_split <- tclVar(0) # change the output of saved gene lists
-tcl_checkbox_cdf_innerjoin <- tclVar(0) # merge the output lists or not
+tcl_checkbox_cdf_innerjoin <- tclVar(1) # merge the output lists or not
 
 # file list varibles  ----   
 
@@ -3186,5 +3186,5 @@ tkgrid.rowconfigure(root,frame_tool,weight=1)
 try(tk2theme("keramik"), silent = TRUE)
 tkraise(root)
 tkbind(root,"<FocusIn>", function() OpenWindowControl())
-}
-expandTk()
+# }
+# expandTk()

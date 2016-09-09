@@ -2,8 +2,7 @@ Ben tools v7
 
 http://www.sciviews.org/recipes/tcltk/toc/
 
-add lower cdf remove data points and add more points
-add more points to sort upper and lower limits
+
 ####### version C?########
 add a higher level of notbook and group simular tools together?
   sort, quantil
@@ -32,3 +31,4 @@ save file has sugjested name
 fix zoomin main plot yaxis
 added quantiles to cluster tab
 added in options to split gene out list on ; + - |
+updated numbers on dropdown lists
