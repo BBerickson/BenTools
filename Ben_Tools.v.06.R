@@ -1,8 +1,31 @@
-my_version_num <- 'Ben Tools v.06a'
+my_version_num <- 'Ben Tools v.06b1'
 
-# fixed to gene tools to work on MAC
+# fix cancel load file if there is no file already loaded
+# fix if all bins are NA/0 ploting
+# add plot all gene lists button
+# fix end bin box in gene tools to be independent like start box
+# laod file auto plot
+# add stat plot button
+# ablility to not have dots
+# remove start line and bin defalut box and add ablitiy in plot options
+# 
+# update and alow laoding of color files
+# pass created gene list to loaded list
 
+##### new ########
+# add bins to norm to gene check box
+# add intersect top/bottom beween the two lists to 3ed
+# add incusive gene list to 3ed on on region and ratio
+# norm file no longer log2, now log2 checkbox on plotting
+# disabled stats plot ... need to make button
+# made per gene RF
+# made clustering
+# removed the header, ylable and xlable defalut on plot
+# thicked up lines and asis tiks and text
+# outside legend now on top of plot ... needs more work
+# norm file ok closes all sub windows
 
+# load packages ----
 if(require("tcltk")){
     print("tcltk is loaded correctly")
 } else {
@@ -15,12 +38,32 @@ if(require("tcltk")){
     }
 }
 
+if (require("tcltk2")){
+  print("tcltk2 is loaded correctly")
+} else {
+  print("trying to install tcltk2")
+  install.packages("tcltk2")
+  if (require(tcltk2)){
+    print("tcltk2 installed and loaded")
+  } else {
+    stop("could not install tcltk2")
+  }
+}
 
+if(require("flashClust")){
+  print("flashClust is loaded correctly")
+} else {
+  print("trying to install flashClust")
+  install.packages("flashClust")
+  if(require(flashClust)){
+    print("flashClust installed and loaded")
+  } else {
+    stop("could not install flashClust")
+  }
+}
 
 #Globals ----
-my_colors <- c("#a6cee3",  "#1f78b4",  "#b2df8a",  "#33a02c",  "#fb9a99",  "#e31a1c",  "#fdbf6f",  "#ff7f00",  "#cab2d6", "#a6cee3",  "#1f78b4",  "#b2df8a",  "#33a02c",  "#fb9a99",  "#e31a1c",  "#fdbf6f",  "#ff7f00",  "#cab2d6")
-
-#my_colors <- c("black",  "red",  "green",  "blue",  "grey",  "pink",  "purple",  "burgundy",  "orange", "brown",  "fuchsia",  "cyan",  "#33a02c",  "#fb9a99",  "#e31a1c",  "#fdbf6f",  "#ff7f00",  "#cab2d6")
+my_colors <- c("#a6cee3",  "#1f78b4",  "#b2df8a",  "#33a02c",  "#fb9a99",  "#e31a1c",  "#fdbf6f",  "#ff7f00",  "#cab2d6", "#a6cee3",  "#1f78b4",  "#b2df8a",  "#33a02c",  "#fb9a99",  "#e31a1c",  "#fdbf6f",  "#ff7f00",  "#cab2d6","black",  "red",  "green",  "blue",  "grey",  "pink",  "purple",  "burgundy",  "orange", "brown",  "fuchsia",  "cyan",  "#33a02c",  "#fb9a99",  "#e31a1c",  "#fdbf6f",  "#ff7f00",  "#cab2d6")
 FILE_LIST <- list(NULL) # for holding table files in list
 my_list <- list(NULL, NULL, NULL) # [[1]] all common genes, [[2]] list name and all common genes, [[3]] name (do I use this one on loaded gene lists?)
 GENE_LIST <- list(list(NULL, "Genes in common",NULL, NULL, NULL, NULL, NULL,NULL), my_list, my_list, my_list, my_list) 
@@ -40,7 +83,7 @@ STATE <- c(0, 0, 0, 0, 0, 0, 0) # Keep track of the state and flow control
 
 #tclvar ----
 Legend_loc <- c("outside", "topright", "top", "topleft", "bottomright", "bottom", "bottomleft", "right", "left", "No legend")
-Legend_loc2 <- tclVar("topleft")
+Legend_loc2 <- tclVar(Legend_loc[4])
 Legend_size <- tclVar(0.8)
 Header <- tclVar('')
 Header_size <- tclVar(2.0)
@@ -49,30 +92,32 @@ xlable <- tclVar('')
 ylable_size <- tclVar(1.7)
 xlable_size <- tclVar(1.7)
 Txt_one <- tclVar('TSS')
-Txt_two <- tclVar('PolyA')
+Txt_two <- tclVar('TTS')
 Txt_three <- tclVar('500')
 Txt_four <- tclVar('500')
-Txt_five <- tclVar('-1450')
-Txt_six <- tclVar('+3450')
-Txt_seven <- tclVar('')
-Txt_eight <- tclVar('')
+Txt_five <- tclVar('-1450 3450')
 Pos_one <- tclVar(15.5)
 Pos_two <- tclVar(45.5)
 Pos_three <- tclVar(20.5)
 Pos_four <- tclVar(40.5)
-Pos_five <- tclVar(1)
-Pos_six <- tclVar(80)
-Pos_seven <- tclVar(0)
-Pos_eight <- tclVar(0)
+Pos_five <- tclVar("1 80")
 cbValue_ylim <- tclVar("0")
 cbValue_lable <- tclVar("1")
-cbValue_relative_frequency <- tclVar("1")
+cbValue_relative_frequency <- tclVar("0")
+cbValue_gene_relative_frequency <- tclVar("0")
+cbValue_gene_cluster_relative_frequency <- tclVar("1")
+cbValue_log2 <- tclVar("0")
+cbValue_gene_norm <- tclVar("0")
 start_bin <- tclVar(1) 
 stop_bin <- tclVar(1)
+start_bin_norm <- tclVar(1)
+stop_bin_norm <- tclVar(1)
 max_ylim <- tclVar('')
 min_ylim <- tclVar('')
 my_math <- c(" mean", " sum", " median")
 my_math2 <- tclVar(' mean')
+my_Pos_Txt <- c("543 bins 20,20,40", "5 1.5k-2k 70 bins", "543 bins 10,10,10", "543 bins 20,20,20", "5 .5k-1.5k")
+my_Pos_Txt2 <- tclVar(my_Pos_Txt[1])
 my_percent  <- c(" top_25%", " top_50%", " top_75%", " ALL", " bottom_50%", " bottom_25%", 
 	" bottom_10%", " bottom_5%", " ALL", " top_5%", " top_10%")
 my_dotlist <- c("circle", "triangle point up", "plus", "cross", "diamond", 
@@ -87,13 +132,15 @@ one_diff <- tclVar(2)
 fold_diff <- tclVar(2)
 start_bin1 <- tclVar(1)
 one_bin1 <- tclVar(1) 
+start_bin_cluster <- tclVar(1)
 
 # code ----
 
-#handle getting and setting start default values
-tt <- tktoplevel() 
-tcl("wm", "attributes", tt, topmost = TRUE)
-tcl('wm', "resizable", tt, F, F)
+# keeps numbers, empty string for the rest
+# from https://github.com/gsk3/taRifx/blob/master/R/Rfunctions.R#L1161
+Destring <- function(x, keep = "0-9.-") {
+  return(as.numeric(gsub(paste("[^", keep, "]+", sep=""), "", x)))
+}
 
 #reads in file and pass on to fill out genes in lists ... STATS, GENE_LIST 
 GetTableFile <- function(biglist, genelist, GM, G1, G2, G3, G4, GMC, G1gC, G1C, G2C, G3C, G4C) {
@@ -104,7 +151,7 @@ GetTableFile <- function(biglist, genelist, GM, G1, G2, G3, G4, GMC, G1gC, G1C, 
 		if(file_count > 10){ 
 			tkmessageBox(message = "I have too many files, you need to reset me or remove some files")
 			STATE[5] <<- 0
-			return(biglist)
+			return()
 		}
 		tcl("wm", "attributes", mainframe, topmost=F)
 		pb <<- tkProgressBar(title = "Loading file, please be patient!!", width = 300 ) # move progress for every step
@@ -120,22 +167,26 @@ GetTableFile <- function(biglist, genelist, GM, G1, G2, G3, G4, GMC, G1gC, G1C, 
 			STATE[5] <<- 0
 			close(pb)
 			tcl("wm", "attributes", mainframe, topmost=TRUE)
-			return(biglist)
+			return()
 		}else{
 			l_name <- strsplit(as.character(file_name), '/')
 			ld_name <- paste(l_name[[1]][(length(l_name[[1]]))])
 			legend_name <- paste(strsplit(as.character(ld_name), '.ta')[[1]][1])
 			first_file <- read.table(file_name, header = TRUE, stringsAsFactors= FALSE, comment.char = "")
 			names(first_file)[1]<-paste("gene")
+			
+ 			first_file[,-1][is.na(first_file[,-1])] <- 0 # need to test for speed
+			first_file[,-1] <- as.numeric((as.matrix(first_file[,-1])))
+			
 			num_bins <- dim(first_file)
 			gene_names <- c(GENE_LIST[[1]][[2]][-1], unique(first_file[,1])) # change to test
 			if(file_count > 0){
-				if(num_bins[2] - 1 != length(biglist[[1]]) - 1){
+				if(num_bins[2] - 1 != length(FILE_LIST[[1]]) - 1){
 					close(pb)
 					tkmessageBox(message = "Can't load file, different number of bins")
 					STATE[5] <<- 0
 					tcl("wm", "attributes", mainframe, topmost=TRUE)
-					return(biglist)
+					#return()
 				}
 				gene_names <- gene_names[duplicated(gene_names)] # pass to handle gene list
 				if(length(gene_names) > 0){
@@ -145,11 +196,12 @@ GetTableFile <- function(biglist, genelist, GM, G1, G2, G3, G4, GMC, G1gC, G1C, 
 					tkmessageBox(message = "Can't load file, no genes in common or remake your table files all the same way.")
 					STATE[5] <<- 0
 					tcl("wm", "attributes", mainframe, topmost=TRUE)
-					return(biglist)
+					return()
 				}
 			}else{
 				tkdelete(stop_box, 0, 'end')
 				tkinsert(stop_box, "end", num_bins[2] - 1)
+				stop_bin_norm <<- tclVar(num_bins[2] - 1)
 				GENE_LIST[[1]][[2]] <<- c(GENE_LIST[[1]][[2]][1], gene_names)
 			}
 			file_count <- file_count + 1
@@ -161,16 +213,14 @@ GetTableFile <- function(biglist, genelist, GM, G1, G2, G3, G4, GMC, G1gC, G1C, 
 				(sum(is.na(first_file)) / (num_bins[1] * num_bins[2])) * 100)
 			GENE_LIST[[1]][[7]] <<- c(GENE_LIST[[1]][[7]], summary(colMeans(first_file[,-1]))[1:6]) #summary[7] holds NA's if they exist  
 			UpdateFileLists(file_count, gene_names, GM, G1, G2, G3, G4, GMC, G1C, G2C, G3C, G4C, c(0:4), TRUE, 0) # change c(1:4) option in the function, only run if number of common genes changes
-			#first_file[is.na(first_file)] <- 0 # need to test for speed
-			biglist[[file_count]] <- first_file
+			FILE_LIST[[file_count]] <<- first_file
 		}
-		StatsPlot()
-		tcl("wm", "attributes", mainframe, topmost=TRUE)
+		#StatsPlot()
 		STATE[5] <<- 0	
 		close(pb)
-		return(biglist)
 	}
-	return(biglist)
+  tcl("wm", "attributes", mainframe, topmost = TRUE)
+
 }
 
 #build GENE_LIST
@@ -180,10 +230,9 @@ BuildGeneList <- function(){
 
 #Plot stats on loaded file
 StatsPlot <- function(){ # update pb, # move legend to outside and adjust margins 
-
-#need to add gene number to plot
-cc <- NULL 
-count <-length(GENE_LIST[[1]][[3]])
+  #need to add gene number to plot
+  cc <- NULL 
+  count <-length(GENE_LIST[[1]][[3]])
 	for(i in 1 : count){
 			cc <- c(cc, COLOR_LIST[[1]][i])
 		}
@@ -326,6 +375,117 @@ HandleGeneList <- function(list1, len, gene_list, list_in, list_name, gg, ggc){
 		return(list_out)		
 	}
 	return("")
+}
+
+# filling out Pos and Txt entry boxes
+Pos_Txt <- function(my_Pos_Txt2){
+  my_name <- tclvalue(my_Pos_Txt2)
+  if(my_name == "5 .5k-1.5k"){
+    tkdelete(Box_Pos_one, 0, 'end')
+    tkinsert(Box_Pos_one, 0, '10.5')
+    tkdelete(Box_Pos_two, 0, 'end')
+    tkinsert(Box_Pos_two, 0, '0')
+    tkdelete(Box_Pos_three, 0, 'end')
+    tkinsert(Box_Pos_three, 0, '0')
+    tkdelete(Box_Pos_four, 0, 'end')
+    tkinsert(Box_Pos_four, 0, '0')
+    tkdelete(Box_Pos_five, 0, 'end')
+    tkinsert(Box_Pos_five, 0, '1 40')
+    tkdelete(Box_Txt_one, 0, 'end')
+    tkinsert(Box_Txt_one, 0, 'TSS')
+    tkdelete(Box_Txt_two, 0, 'end')
+    tkinsert(Box_Txt_two, 0, '')
+    tkdelete(Box_Txt_three, 0, 'end')
+    tkinsert(Box_Txt_three, 0, '')
+    tkdelete(Box_Txt_four, 0, 'end')
+    tkinsert(Box_Txt_four, 0, '')
+    tkdelete(Box_Txt_five, 0, 'end')
+    tkinsert(Box_Txt_five, 0, '-450 1450')
+  } else if(my_name == "543 bins 10,10,10") {
+    tkdelete(Box_Pos_one, 0, 'end')
+    tkinsert(Box_Pos_one, 0, '5.5')
+    tkdelete(Box_Pos_two, 0, 'end')
+    tkinsert(Box_Pos_two, 0, '25.5')
+    tkdelete(Box_Pos_three, 0, 'end')
+    tkinsert(Box_Pos_three, 0, '10.5')
+    tkdelete(Box_Pos_four, 0, 'end')
+    tkinsert(Box_Pos_four, 0, '20.5')
+    tkdelete(Box_Pos_five, 0, 'end')
+    tkinsert(Box_Pos_five, 0, '1 30')
+    tkdelete(Box_Txt_one, 0, 'end')
+    tkinsert(Box_Txt_one, 0, 'TSS')
+    tkdelete(Box_Txt_two, 0, 'end')
+    tkinsert(Box_Txt_two, 0, 'TTS')
+    tkdelete(Box_Txt_three, 0, 'end')
+    tkinsert(Box_Txt_three, 0, '500')
+    tkdelete(Box_Txt_four, 0, 'end')
+    tkinsert(Box_Txt_four, 0, '500')
+    tkdelete(Box_Txt_five, 0, 'end')
+    tkinsert(Box_Txt_five, 0, '-450 1450')
+  } else if(my_name == "543 bins 20,20,20"){
+    tkdelete(Box_Pos_one, 0, 'end')
+    tkinsert(Box_Pos_one, 0, '10.5')
+    tkdelete(Box_Pos_two, 0, 'end')
+    tkinsert(Box_Pos_two, 0, '50.5')
+    tkdelete(Box_Pos_three, 0, 'end')
+    tkinsert(Box_Pos_three, 0, '20.5')
+    tkdelete(Box_Pos_four, 0, 'end')
+    tkinsert(Box_Pos_four, 0, '40.5')
+    tkdelete(Box_Pos_five, 0, 'end')
+    tkinsert(Box_Pos_five, 0, '1 60')
+    tkdelete(Box_Txt_one, 0, 'end')
+    tkinsert(Box_Txt_one, 0, 'TSS')
+    tkdelete(Box_Txt_two, 0, 'end')
+    tkinsert(Box_Txt_two, 0, 'TTS')
+    tkdelete(Box_Txt_three, 0, 'end')
+    tkinsert(Box_Txt_three, 0, '500')
+    tkdelete(Box_Txt_four, 0, 'end')
+    tkinsert(Box_Txt_four, 0, '500')
+    tkdelete(Box_Txt_five, 0, 'end')
+    tkinsert(Box_Txt_five, 0, '-450 1450')
+  } else if(my_name == "5 1.5k-2k 70 bins"){
+    tkdelete(Box_Pos_one, 0, 'end')
+    tkinsert(Box_Pos_one, 0, '30.5')
+    tkdelete(Box_Pos_two, 0, 'end')
+    tkinsert(Box_Pos_two, 0, '0')
+    tkdelete(Box_Pos_three, 0, 'end')
+    tkinsert(Box_Pos_three, 0, '0')
+    tkdelete(Box_Pos_four, 0, 'end')
+    tkinsert(Box_Pos_four, 0, '0')
+    tkdelete(Box_Pos_five, 0, 'end')
+    tkinsert(Box_Pos_five, 0, '1 70')
+    tkdelete(Box_Txt_one, 0, 'end')
+    tkinsert(Box_Txt_one, 0, 'TSS')
+    tkdelete(Box_Txt_two, 0, 'end')
+    tkinsert(Box_Txt_two, 0, '')
+    tkdelete(Box_Txt_three, 0, 'end')
+    tkinsert(Box_Txt_three, 0, '')
+    tkdelete(Box_Txt_four, 0, 'end')
+    tkinsert(Box_Txt_four, 0, '')
+    tkdelete(Box_Txt_five, 0, 'end')
+    tkinsert(Box_Txt_five, 0, '-1450 1950')
+  } else {
+    tkdelete(Box_Pos_one, 0, 'end')
+    tkinsert(Box_Pos_one, 0, '15.5')
+    tkdelete(Box_Pos_two, 0, 'end')
+    tkinsert(Box_Pos_two, 0, '45.5')
+    tkdelete(Box_Pos_three, 0, 'end')
+    tkinsert(Box_Pos_three, 0, '20.5')
+    tkdelete(Box_Pos_four, 0, 'end')
+    tkinsert(Box_Pos_four, 0, '40.5')
+    tkdelete(Box_Pos_five, 0, 'end')
+    tkinsert(Box_Pos_five, 0, '1 80')
+    tkdelete(Box_Txt_one, 0, 'end')
+    tkinsert(Box_Txt_one, 0, 'TSS')
+    tkdelete(Box_Txt_two, 0, 'end')
+    tkinsert(Box_Txt_two, 0, 'TTS')
+    tkdelete(Box_Txt_three, 0, 'end')
+    tkinsert(Box_Txt_three, 0, '500')
+    tkdelete(Box_Txt_four, 0, 'end')
+    tkinsert(Box_Txt_four, 0, '500')
+    tkdelete(Box_Txt_five, 0, 'end')
+    tkinsert(Box_Txt_five, 0, '-1450 3450')
+  }
 }
 
 #reads in gene list files
@@ -480,8 +640,8 @@ tkmessageBox(message = "You need to activate a list first")
 }
 
 #sorts active gene list contain top % signal based on selected bins and file
-SortTop <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, genelistcount1, 
-	genelistcount2, tablefile, startbin1, startbox1, stopbin1, stopbox1, number) {
+SortTop <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, genelist3, genelistcount1, 
+	genelistcount2, genelistcount3, tablefile, startbin1, startbox1, stopbin1, stopbox1, number) {
 	if(BusyTest()){
 		CloseSubWindows(c(3,4))
 		STATE[5] <<- 1
@@ -555,9 +715,14 @@ SortTop <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, ge
 			ix <- sort(apply_bins, decreasing=T, index=T)$ix
 			lc <- lc+1
 			outlist[[lc]] <- as.character(mch[ix,1][num[1]:num[2]])
+			if(lc == 2){
+			  test3 <- c(outlist[[1]], outlist[[2]])
+			  outlist[[3]] <- test3[duplicated(test3)]
+			}
 		}
 		tkdelete(genelist1, 0, 'end')
 		tkdelete(genelist2, 0, 'end')
+		tkdelete(genelist3, 0, 'end')
 		if(length(outlist[[1]]) > 0){
 			tkconfigure(genelist1, listvariable = tclVar(as.character(outlist[[1]])))
 		}
@@ -565,15 +730,22 @@ SortTop <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, ge
 			if(length(outlist[[2]]) > 0){
 				tkconfigure(genelist2, listvariable = tclVar(as.character(outlist[[2]])))
 			}
+		  if(length(outlist[[3]]) > 0){
+		    tkconfigure(genelist3, listvariable = tclVar(as.character(outlist[[3]])))
+		  }
 		}
 		tkdelete(genelistcount1, 0, 'end')
 		tkdelete(genelistcount2, 0, 'end')
+		tkdelete(genelistcount3, 0, 'end')
 		lstcount1 <- paste('n = ', (as.integer(tksize(genelist1))))
 		lstcount1a <- paste(R_num , ' in ',tclvalue(tkget(filelist2,0)))
 		tkinsert(genelistcount1, "end", lstcount1, lstcount1a)
 		lstcount2 <- paste('n = ', (as.integer(tksize(genelist2))))
 		lstcount2a <- paste(R_num , ' in ',tclvalue(tkget(filelist2,1)))
 		tkinsert(genelistcount2, "end", lstcount2, lstcount2a)
+		lstcount3 <- paste('n = ', (as.integer(tksize(genelist3))))
+		lstcount3a <- paste(R_num , ' in both ')
+		tkinsert(genelistcount3, "end", lstcount3, lstcount3a)
 		close(pb)
 		STATE[5] <<- 0
 		return()
@@ -583,8 +755,8 @@ SortTop <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, ge
 
 #takes two reigns of genes and compares the signal, generates gene lists outside of fold diff and
 	# makes a scatter plot
-plotSOne <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, genelistcount1, 
-	genelistcount2, tablefile, up_bin1, up_box1, up_bin2, up_box2, number, num_box) {
+plotSOne <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, genelist3, genelistcount1, 
+	genelistcount2, genelistcount3, tablefile, up_bin1, up_box1, up_bin2, up_box2, number, num_box) {
 	if(BusyTest()){
 		CloseSubWindows(c(3,4))
 		STATE[5] <<- 1
@@ -655,8 +827,10 @@ plotSOne <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, g
 			myout2 <- sort(myout, decreasing=F, index=T)$ix
 			test1 <- myout[myout1] > R_num
 			test2 <- myout[myout2] < 1/R_num
+			test3 <- myout <= R_num & myout >= 1/R_num
 			outlist1 <- mch$gene[myout1][test1]
 			outlist2 <- mch$gene[myout2][test2]
+			outlist3 <- mch$gene[test3]
 			xlab = paste(my_list2[2])
 			ylab = paste(my_list2[1])
 			par(mar=c(5.1, 5.5, 4.1, 8.1))
@@ -670,29 +844,39 @@ plotSOne <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, g
 				}
 			mtext("\nRegion plot",side=3)	
 			abline(0,1,col="orange")
-			abline(0,(R_num),col="blue")
-			abline(0,(1/R_num),col="blue")
-			abline(lm(out~out0),col="red")
+			#abline(0,(R_num),col="blue")
+			#abline(0,(1/R_num),col="blue")
+			#abline(lm(out~out0),col="red")
 			title(sub=paste("Bins",R_up_bin1,"to",R_up_bin2,": cut off of",R_num,sep=" "))
 			pb <- tkProgressBar(title = "be patient!!",  min = 0, max = 100, width = 300 )
 			tkdelete(genelist1, 0, 'end')
 			tkdelete(genelist2, 0, 'end')
+			tkdelete(genelist3, 0, 'end')
 			tkdelete(genelistcount1, 0, 'end')
 			tkdelete(genelistcount2, 0, 'end')
-			if(length(outlist1)> 0){
+			tkdelete(genelistcount3, 0, 'end')
+			if(length(outlist1) > 0){
 				tkconfigure(genelist1, listvariable = tclVar(as.character(outlist1)))
 			}
-			if(length(outlist2)> 0){
+			if(length(outlist2) > 0){
 				tkconfigure(genelist2, listvariable = tclVar(as.character(outlist2)))
+			}
+			if(length(outlist3) > 0){
+			  tkconfigure(genelist3, listvariable = tclVar(as.character(outlist3)))
 			}
 				lstcount1 <- paste('n = ', (as.integer(tksize(genelist1))), "up ", R_num, "fold")
 				lstcount1a <- paste(my_list2[1])
 				tkinsert(genelistcount1, "end", lstcount1, lstcount1a)
-				lstcount2 <- paste('n = ', (as.integer(tksize(genelist2))), "down ", round(1/R_num,digits=4), "fold")
-				lstcount2a <- paste(my_list2[1])
+				lstcount2 <- paste('n = ', (as.integer(tksize(genelist2))), "down ", R_num, "fold")
+				lstcount2a <- paste(my_list2[2])
 				tkinsert(genelistcount2, "end", lstcount2, lstcount2a)
+				lstcount3 <- paste('n = ', (as.integer(tksize(genelist3))))
+				lstcount3a <- paste("less then", R_num, "fold change")
+				tkinsert(genelistcount3, "end", lstcount3, lstcount3a)
 				close(pb)
-				mtext(c(paste("n = ",length(mch[,1])),"\n\nliner regression line", "\n\n\n\nline through 0",paste("\n\n\n\n\n\nupper cut off, n = ",as.integer(tksize(genelist1))), paste("\n\n\n\n\n\n\n\nlower cut off, n = ",as.integer(tksize(genelist2)))),las=1,side = 4, line = 1, bty = "n", cex = .8, col = c("black","red","orange","blue","blue"))
+				# mtext(c(paste("n = ",length(mch[,1])),"\n\nliner regression line", "\n\n\n\nline through 0",paste("\n\n\n\n\n\nupper cut off, n = ",as.integer(tksize(genelist1))), paste("\n\n\n\n\n\n\n\nlower cut off, n = ",as.integer(tksize(genelist2)))),las=1,side = 4, line = 1, bty = "n", cex = .8, col = c("black","red","orange","blue","blue"))
+				mtext(c(paste("n = ", length(mch[,1])), "\n\n\n\nline through 0",paste("\n\n\n\n\n\nupper cut off, n = ",as.integer(tksize(genelist1))), paste("\n\n\n\n\n\n\n\nlower cut off, n = ",as.integer(tksize(genelist2)))),las=1,side = 4, line = 1, bty = "n", cex = .8, col = c("black","orange","blue","blue"))
+				
 				par(mar=c(5.1, 5.5, 4.1, 4.1), xpd=FALSE)
 		}else{
 			tkmessageBox(message = "You need to have two samples to use this tool.")
@@ -705,8 +889,8 @@ plotSOne <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, g
 
 #takes two reigns of genes and compares the log2 signal, generates gene lists outside of fold diff and
 	# makes a scatter plot
-plotEI <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, genelistcount1, 
-	genelistcount2, tablefile, up_bin1, up_box1, up_bin2, up_box2, down_bin1, down_box1, down_bin2, 
+plotEI <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, genelist3, genelistcount1, 
+	genelistcount2, genelistcount3, tablefile, up_bin1, up_box1, up_bin2, up_box2, down_bin1, down_box1, down_bin2, 
 		down_box2, number, num_box) {
 	if(BusyTest()){
 		CloseSubWindows(c(3,4))
@@ -773,21 +957,36 @@ plotEI <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, gen
 				rowSums(tablefile[[sel[1]]][,-1][R_down_bin1:R_down_bin2], na.rm = T))
 			tablefile[[sel[2]]][,-1] <- c(rowSums(tablefile[[sel[2]]][,-1][R_up_bin1:R_up_bin2], na.rm = T), 
 				rowSums(tablefile[[sel[2]]][,-1][R_down_bin1:R_down_bin2], na.rm = T))
+			# remove genes with no signal
 			tablefile[[sel[1]]][,-1] <- as.data.frame(lapply(tablefile[[sel[1]]][,-1], function(x){replace(x, x == 0, NA)}))
 			tablefile[[sel[1]]] <- tablefile[[sel[1]]][complete.cases(tablefile[[sel[1]]]),]
 			tablefile[[sel[2]]][,-1] <- as.data.frame(lapply(tablefile[[sel[2]]][,-1], function(x){replace(x, x == 0, NA)}))
 			tablefile[[sel[2]]] <- tablefile[[sel[2]]][complete.cases(tablefile[[sel[2]]]),]
+			# have min signal in gene body
+			tablefile[[sel[1]]] <- tablefile[[sel[1]]][tablefile[[sel[1]]][,2] >= quantile(tablefile[[sel[1]]][,2], probs = c(.01)), ]
+			tablefile[[sel[2]]] <- tablefile[[sel[2]]][tablefile[[sel[2]]][,2] >= quantile(tablefile[[sel[2]]][,2], probs = c(.01)), ]
+			# keep only genes in common
 			mch <- merge(enesg, tablefile[[sel[1]]][,1:3], by="gene", sort=F)
 			mch <- merge(mch, tablefile[[sel[2]]][,1:3], by="gene", sort=F)
-			out <- mch[,3]/mch[,2]
-			out0 <- mch[,5]/mch[,4]
-			myout <- out/out0
+			# saves table
+						# file_name <- paste(paste(my_list2[1]),".txt",sep="")
+						# write.table(mch[,1:3], file_name, col.names = FALSE, row.names=FALSE, quote=FALSE)
+						# file_name <- paste(paste(my_list2[2]),".txt",sep="")
+						# write.table(mch[,-c(2:3)], file_name, col.names = FALSE, row.names=FALSE, quote=FALSE)
+			# 
+			# body-promoter
+			out <- log2(mch[,2])-log2(mch[,3])
+			out0 <- log2(mch[,4])-log2(mch[,5])
+			# compare 1st with 2ed
+			myout <- out-out0
 			myout1 <- sort(myout, decreasing=T, index=T)$ix
 			myout2 <- sort(myout, decreasing=F, index=T)$ix
 			test1 <- myout[myout1] > R_num
-			test2 <- myout[myout2] < 1/R_num
+			test2 <- myout[myout2] < -R_num
+			test3 <- myout <= R_num & myout >= -R_num
 			outlist1 <- mch$gene[myout1][test1]
 			outlist2 <- mch$gene[myout2][test2]
+			outlist3 <- mch$gene[test3]
 			xlab = paste(my_list2[2])
 			ylab = paste(my_list2[1])
 			par(mar=c(5.1, 5.5, 4.1, 9.1))
@@ -795,20 +994,22 @@ plotEI <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, gen
 			points(out0[myout1][test1],out[myout1][test1],col='blue')
 			points(out0[myout2][test2],out[myout2][test2],col='green')
 			abline(0,1,col="orange")
-			abline(0,(R_num),col="blue")
-			abline(0,(1/R_num),col="green")
-			abline(lm(out~out0),col="red")
+			#abline(0,(R_num),col="blue")
+			#abline(0,(1/R_num),col="green")
+			#abline(lm(out~out0),col="red")
 			R_Header <- (as.character(tclvalue(Header)))
 			R_Header_size <- as.numeric(tclvalue(Header_size))
 			if(!is.na(R_Header_size)){
 				title(main = R_Header, cex.main = R_Header_size)
 			}
-			mtext("\nRatio plot (3'/5')",side=3)
-			title(sub=paste("Bins",R_down_bin1,"-",R_down_bin2,"/ Bins",R_up_bin1,"-",R_up_bin2,": cut off of",R_num,sep=" "))
+			mtext("\nLog2 Ratio plot (3'/5')/(3'/5')",side=3)
+			title(sub=paste("Bins",R_up_bin1,"-",R_up_bin2,"/ Bins",R_down_bin1,"-",R_down_bin2,": cut off of",R_num,sep=" "))
 			tkdelete(genelist1, 0, 'end')
 			tkdelete(genelist2, 0, 'end')
+			tkdelete(genelist3, 0, 'end')
 			tkdelete(genelistcount1, 0, 'end')
 			tkdelete(genelistcount2, 0, 'end')
+			tkdelete(genelistcount3, 0, 'end')
 			pb <- tkProgressBar(title = "be patient!!",  min = 0, max = 100, width = 300 )
 			if(length(outlist1)> 0){
 				tkconfigure(genelist1, listvariable = tclVar(as.character(outlist1)))
@@ -816,14 +1017,20 @@ plotEI <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, gen
 			if(length(outlist2)> 0){
 				tkconfigure(genelist2, listvariable = tclVar(as.character(outlist2)))
 			}
-			lstcount1 <- paste('n = ', (as.integer(tksize(genelist1))), "up in 3'/5' ratio")
+			if(length(outlist3) > 0){
+			  tkconfigure(genelist3, listvariable = tclVar(as.character(outlist3)))
+			}
+			lstcount1 <- paste('n = ', (as.integer(tksize(genelist1))), "down in 3'/5' ratio")
 			lstcount1a <- paste(my_list2[2])
 			tkinsert(genelistcount1, "end", lstcount1, lstcount1a)
-			lstcount2 <- paste('n = ', (as.integer(tksize(genelist2))), "up in 3'/5' ratio")
+			lstcount2 <- paste('n = ', (as.integer(tksize(genelist2))), "down in 3'/5' ratio")
 			lstcount2a <- paste(my_list2[1])
 			tkinsert(genelistcount2, "end", lstcount2, lstcount2a)
+			lstcount3 <- paste('n = ', (as.integer(tksize(genelist3))))
+			lstcount3a <- paste("less then", R_num, "fold change")
+			tkinsert(genelistcount3, "end", lstcount3, lstcount3a)
 			close(pb)
-			mtext(c(paste("n = ", length(mch[,1])),"\n\nliner regression line", "\n\n\n\nline through 0",paste("\n\n\n\n\n\nupper cut off, n = ",as.integer(tksize(genelist1))), paste("\n\n\n\n\n\n\n\nlower cut off, n = ",as.integer(tksize(genelist2)))),las=1,side = 4, line = 1, bty = "n", cex = .8, col = c("black","red","orange","blue","green"))
+			mtext(c(paste("n = ", length(mch[,1])), "\n\n\n\nline through 0",paste("\n\n\n\n\n\nupper cut off, n = ",as.integer(tksize(genelist1))), paste("\n\n\n\n\n\n\n\nlower cut off, n = ",as.integer(tksize(genelist2)))),las=1,side = 4, line = 1, bty = "n", cex = .8, col = c("black","orange","blue","green"))
 			par(mar=c(5.1, 5.5, 4.1, 4.1), xpd=FALSE)
 		}else{
 			tkmessageBox(message = "You need to have two samples to use this tool.")
@@ -834,12 +1041,169 @@ plotEI <- function(filelist1, filelist2, maingenelist, genelist1, genelist2, gen
 	return()	
 }
 
+# finds 3 clusers from the one active file, plotting the 3 patterns and displaying the gene lists
+FindClustersSetUpTest <- function(master,filelist1, filelist2, maingenelist, 
+                                  startbin, startbox, stopbin, stopbox, startbin1, 
+                                  startbox1, stopbin1, stopbox1, mymath, 
+                                  minylim, maxylim, minylimbox, maxylimbox, cbylim,
+                                  genelist1, genelist2, genelist3, genelistcount1,
+                                  genelistcount2, genelistcount3) {
+  if(BusyTest()){
+    CloseSubWindows(c(3,4))
+    file_count <- as.integer(tksize(filelist1))
+    file_count2 <- as.integer(tksize(filelist2))
+    if(file_count2 == 1){ # same and plotone
+      sel <- NULL
+      my_list2 <- tclvalue(tkget(filelist2,0))
+      
+      for(f in 1 : file_count){
+        if(my_list2 %in% tclvalue(tkget(filelist1,(f-1))))
+          sel <- f
+      }
+      
+      num_bins <- ncol(master[[1]]) - 1 
+      R_start_bin_cluster <- as.integer(tclvalue(startbin))
+      R_stop_bin_cluster <- as.integer(tclvalue(stopbin))
+      if(is.na(R_stop_bin_cluster) | is.na(R_start_bin_cluster)){
+        R_start_bin_cluster <- 0
+        R_stop_bin_cluster <- 0
+      }			
+      if(R_start_bin_cluster < 1 | R_start_bin_cluster > R_stop_bin_cluster){
+        startbin_cluster <- tclVar(1)
+        tkdelete(startbox, 0, 'end')
+        tkinsert(startbox, "end", 1)
+      } 
+      if(R_stop_bin_cluster < 1 | R_stop_bin_cluster < R_start_bin_cluster | R_stop_bin_cluster > num_bins){
+        stopbin_cluster <- tclVar(num_bins)
+        tkdelete(stopbox, 0, 'end')
+        tkinsert(stopbox, "end", num_bins)
+      }
+      R_start_bin <- as.integer(tclvalue(startbin1))
+      R_stop_bin <- as.integer(tclvalue(stopbin1))
+      if(is.na(R_stop_bin) | is.na(R_start_bin)){
+        R_start_bin <- 0
+        R_stop_bin <- 0
+      }			
+      if(R_start_bin < 1 | R_start_bin > R_stop_bin){
+        startbin1 <- tclVar(1)
+        tkdelete(startbox1, 0, 'end')
+        tkinsert(startbox1, "end", 1)
+      } 
+      if(R_stop_bin < 1 | R_stop_bin < R_start_bin | R_stop_bin > num_bins){
+        stopbin1 <- tclVar(num_bins)
+        tkdelete(stopbox1, 0, 'end')
+        tkinsert(stopbox1, "end", num_bins)
+      }
+      R_my_math <- as.character(tclvalue(mymath))# test noquote()
+      if(R_my_math == " mean"){
+        my_apply <- function(x) colMeans(x, na.rm = T)
+      } else if (R_my_math == " sum"){
+        my_apply <- function(x) colSums(x, na.rm = T)
+      } else if (R_my_math == " median"){
+        my_apply <- function(x) apply(x, 2, median, na.rm = T)
+      } 
+      ylim <- c(as.numeric(tclvalue(minylim)),as.numeric(tclvalue(maxylim)))
+      ylimt <- c(minylim, maxylim, as.character(tclvalue(cbylim)))
+      cbVal_gene_cluster <- as.character(tclvalue(cbValue_gene_cluster_relative_frequency)) 
+      cbVal_gene_relative_frequency <- as.character(tclvalue(cbValue_gene_relative_frequency)) 
+      myList <- NULL
+      clist <- list(NULL)
+      use_col <- NULL
+      tmp <- NULL 
+      subtmp <- list(NULL,NULL)
+      mydots <- NULL
+      mylines <- NULL
+      mylog <- NULL
+      apply_bins <- NULL
+      get_color <- COLOR_LIST[[STATE[6]]]
+      tkdelete(genelist1, 0, 'end')
+      tkdelete(genelist2, 0, 'end')
+      tkdelete(genelist3, 0, 'end')
+      tkdelete(genelistcount1, 0, 'end')
+      tkdelete(genelistcount2, 0, 'end')
+      tkdelete(genelistcount3, 0, 'end')
+      myList <-paste(tkget(maingenelist,0,"end"))
+      enesg <- as.data.frame(matrix(myList)) 
+      colnames(enesg) <- "gene"
+      mch <- merge(enesg, master[[sel]], 
+                   by="gene", sort=FALSE)
+      #samp <- nrow(mch[ , -1])/10
+      clusters.num <- 3
+      mch2 <- mch
+      mch2[is.na(mch2)] <- 0
+      bbb <- min(mch2[,-1][mch2[,-1]>0])/2
+      mch2[,-1] <- as.data.frame(lapply(mch2[,-1], function(x){replace(x, x == 0, bbb)}))
+      #cm <- clara(mch[ ,c(1, (R_start_bin_cluster:R_stop_bin_cluster) + 1)], clusters.num, samples=samp, pamLike = TRUE, metric="manhattan")
+      if(cbVal_gene_cluster == 1){
+        mch2[ , -1] <- mch2[ , -1]/rowSums(mch2[ , -1], na.rm = TRUE)
+      }
+      cm <- hclust(dist(mch2[ ,c((R_start_bin_cluster:R_stop_bin_cluster) + 1)]), method = "ward")
+      for( i in 1 : clusters.num){
+        #clist[[i]] <- mch[cm$clustering == i,]
+        clist[[i]] <- mch[cutree(cm, clusters.num) == i,]
+        if(cbVal_gene_relative_frequency == 1){
+          clist[[i]][ , -1] <- clist[[i]][ , -1]/rowSums(clist[[i]][ , -1], na.rm = TRUE)
+        }
+        use_col <- c(use_col, get_color[i])
+        tmpnum <- paste( "n = ", nrow(clist[[i]]))  
+        tmpnum <- paste(tmpnum, ": list", i, sep=" ")
+        tmptot <- paste(my_list2, "list", i, sep=" : ")
+        tmp <- c(tmp, tmptot)
+        subtmp[[1]] <- paste(subtmp[[1]], tmpnum, sep='    ')
+        my_data <- my_apply(clist[[i]][,-1])
+        apply_bins <- c(apply_bins, my_data)
+        num <- NULL
+        setdot <- OPTIONS_LIST[[STATE[6]]][[sel]][1]
+        num <- which(my_dotlist == setdot)
+        if(num == 21){
+          num <- 0
+        }
+        num2 <- NULL
+        setline <- OPTIONS_LIST[[STATE[6]]][[sel]][2]
+        num2 <- which(my_linelist == setline)
+        if(num2 > 6){
+          num2 <- 0
+        }
+        mydots <- c(mydots, num)
+        mylines <- c(mylines, num2)
+        mylog <- c(mylog, OPTIONS_LIST[[STATE[6]]][[sel]][3])
+      }
+      subtmp[[2]] <- R_my_math
+      subtmp[[1]] <- paste("bins ", R_start_bin_cluster, ":", R_stop_bin_cluster, "  ", subtmp[[1]])
+      if(nrow(clist[[1]]) > 0){
+        tkconfigure(genelist1, listvariable = tclVar(as.character(clist[[1]][,1])))
+      }
+      if(nrow(clist[[2]]) > 0){
+        tkconfigure(genelist2, listvariable = tclVar(as.character(clist[[2]][,1])))
+      }
+      if(nrow(clist[[3]]) > 0){
+        tkconfigure(genelist3, listvariable = tclVar(as.character(clist[[3]][,1])))
+      }
+      
+      lstcount1 <- paste('n = ', (as.integer(tksize(genelist1))), "list 1")
+      lstcount1a <- paste(my_list2)
+      tkinsert(genelistcount1, "end", lstcount1, lstcount1a)
+      lstcount2 <- paste('n = ', (as.integer(tksize(genelist2))), "list 2")
+      lstcount2a <- paste(my_list2)
+      tkinsert(genelistcount2, "end", lstcount2, lstcount2a)
+      lstcount3 <- paste('n = ', (as.integer(tksize(genelist3))), "list 3")
+      lstcount3a <- paste(my_list2)
+      tkinsert(genelistcount3, "end", lstcount3, lstcount3a)
+      HandlePlotMods(clusters.num, apply_bins, num_bins, norm_bin, 
+                     tmp, subtmp, use_col, startbin1, stopbin1, ylim, 
+                     ylimt, minylimbox, maxylimbox, mydots, mylines, mylog)
+    }else{
+      tkmessageBox(message = "You can have only one active file to use this tool.")
+    }
+  }
+}
+
 #quits program and closes plot window
 quit_Program <- function() {
 	if(BusyTest()){
 		CloseSubWindows(c(4:2))
 		tkdestroy(mainframe)
-		tkdestroy(tt)
+		#tkdestroy(tt)
 		dev.off()
 	}else{
 		return()
@@ -1071,15 +1435,18 @@ HandleLinePlot <<- function(lst) {
 		}
 	}
 
-#handles sample norm for plotting
+# handles sample norm for plotting
 HandleSamplePlot <- function(lst1, lmod, sel, lst) { 
 	#opens frame with select what sample to normalize to to use
 	if(BusyTest()){
 		CloseSubWindows(4)
-		if(as.integer(tksize(file_list)) > 10){ 
+		if(as.integer(tksize(file_list)) > 20){ 
 			tkmessageBox(message = "I have too many files, you need to reset me or remove some files first")
 			return()
 		}
+	  if(STATE[1] == 1){
+	    swapFrame()	
+	  }
 			SubOptionsFrame <<-tktoplevel()
 			STATE[4] <<- 1	
 			tkbind(SubOptionsFrame, "<Destroy>", function() STATE[4] <<- 0)
@@ -1090,11 +1457,32 @@ HandleSamplePlot <- function(lst1, lmod, sel, lst) {
 					tkdelete(lst1,0) 
 					tkinsert(lst1, 0, tclvalue(Name))
 					if(j>0){
+					  R_start_bin <- as.integer(tclvalue(start_bin_norm))
+					  R_stop_bin <- as.integer(tclvalue(stop_bin_norm))
+					  if(is.na(R_stop_bin) | is.na(R_start_bin)){
+					    tkmessageBox(message = "please use bins that will work with this data")
+					  }			
+					  if(R_start_bin < 1 | R_start_bin > R_stop_bin){
+					    tkmessageBox(message = "please use bins that will work with this data")
+					  } 
+					  if(R_stop_bin < 1 | R_stop_bin < R_start_bin | R_stop_bin > (ncol(FILE_LIST[[1]]))){
+					    tkmessageBox(message = "please use bins that will work with this data")
+					  }
 						mch <- merge(FILE_LIST[[(sel+1)]], FILE_LIST[[j]], by="gene")
-						bbb <- min(mch[,-1][mch[,-1]>0])
+						mch[is.na(mch)] <- 0
+						bbb <- min(mch[,-1][mch[,-1]>0])/2
 						mch[,-1] <- as.data.frame(lapply(mch[,-1], function(x){replace(x, x == 0, bbb)}))
 						len <- (length(mch[,-1])/2)
-						newname <- paste("log2(",as.character(tclvalue(tkget(lst,sel))),")-log2(",as.character(tclvalue(Name)),")")
+						if(tclvalue(cbValue_gene_norm) == "0"){
+						  FILE_LIST[[as.integer(tksize(lst))+1]] <<- data.frame(mch[, 1], 
+						                                    mch[, 2 : (len + 1)] / mch[, (len + 2) : ((len * 2) + 1)])
+						  newname <- paste(as.character(tclvalue(tkget(lst,sel))),"/",as.character(tclvalue(Name)))
+						} else {
+						  FILE_LIST[[as.integer(tksize(lst))+1]] <<- data.frame(mch[,1], 
+						      mch[, 2 : (len + 1)] / rowSums(mch[, (len + 2) : ((len * 2) + 1)][R_start_bin : R_stop_bin]))
+						  newname <- paste(as.character(tclvalue(tkget(lst,sel))),"/sum(",as.character(tclvalue(Name)),")bins ", 
+						                   R_start_bin, ":", R_stop_bin)
+						}
 						tkinsert(lst,"end", newname)
 						GENE_LIST[[1]][[3]] <<- c(GENE_LIST[[1]][[3]], newname)
 						GENE_LIST[[1]][[4]] <<- c(GENE_LIST[[1]][[4]], newname) 
@@ -1103,29 +1491,29 @@ HandleSamplePlot <- function(lst1, lmod, sel, lst) {
 						GENE_LIST[[1]][[7]] <<- c(GENE_LIST[[1]][[7]], 0,0,0,0,0,0) 
 						gene_names <- c(GENE_LIST[[1]][[2]][-1], mch[,1])
 						gene_names <- gene_names[duplicated(gene_names)]
-						FILE_LIST[[as.integer(tksize(lst))]] <<- data.frame(mch[,1] ,log2(mch[,2:(len+1)])-log2(mch[,(len+2):((len*2)+1)]))
 						names(FILE_LIST[[as.integer(tksize(lst))]])[1] <<- paste("gene")
 						UpdateFileLists(as.integer(tksize(lst)), gene_names, lst, gene_list0,	gene_list1, gene_list2, gene_list3, 
-					gene_main_count, gene_list0_count,	gene_list1_count, gene_list2_count, gene_list3_count, c(0:4), TRUE, 1)
+					gene_main_count, gene_list0_count,	gene_list1_count, gene_list2_count, gene_list3_count, c(0:4), TRUE, 0)
 					}
 				}
-				STATE[4] <<- 0
-				tkdestroy(SubOptionsFrame)
+				CloseSubWindows(c(4,3))
 			}
-			tkpack(tklabel(SubOptionsFrame,text="Sample to normalize to"))
-			OK_but <- tkbutton(SubOptionsFrame,text="   OK   ",command=OnOK)
-			tkpack(OK_but, side = "top")
-			yscr <- tkscrollbar(SubOptionsFrame, repeatinterval = 5, command = function(...)
-				tkyview(mysamplelist, ...))
-			mysamplelist <- (tklistbox(SubOptionsFrame, height = 10,width = 50, selectmode="single", 
-				background = "white", yscrollcommand = function(...) tkset(yscr, ...)))
+			tkgrid(tklabel(SubOptionsFrame, text = "Sample to normalize to"), columnspan = 6, row = 0)
+			tkgrid(OK_but <- tkbutton(SubOptionsFrame,text="   OK   ",command = OnOK), columnspan = 6, row = 1)
+			tkgrid(tkcheckbutton(SubOptionsFrame, variable = cbValue_gene_norm, text = "norm to gene sum"),
+			       column = 0, row = 2)
+			
+			tkgrid(tklabel(SubOptionsFrame, text = ' Bins to sum'), columnspan = 3, column = 1, row = 2)
+			tkgrid(tk2entry(SubOptionsFrame, width = 2, textvariable = start_bin_norm), columnspan = 3, column = 2, row = 2)
+			tkgrid(tklabel(SubOptionsFrame, text = '- '), columnspan = 2, column = 3, row = 2, padx = c(0, 0))			
+			tkgrid(tk2entry(SubOptionsFrame, width = 2, textvariable = stop_bin_norm), column = 4, row = 2)
+			tkgrid(mysamplelist <- tk2listbox(SubOptionsFrame, height = 10, width = 50, selectmode="single", 
+				background = "white"), columnspan = 6, row = 3,pady = c(15, 15), padx = c(15, 15))
 			tkinsert(mysamplelist, 0, "select sample for normalization")
 			for(i in 1 : as.integer(tksize(lst))){
 					tkinsert(mysamplelist, i, tclvalue(tkget(lst,(i-1))))
 			}
-			tkpack(mysamplelist, pady = c(10, 10), padx = c(10, 10), side = "left")
 			tkselection.set(mysamplelist,0)
-			tkpack(yscr, fill = 'y', side = "left")
 			tcl("wm", "attributes", SubOptionsFrame, topmost=T)
 	}else{
 		return()
@@ -1193,12 +1581,26 @@ Setup_Test <- function(master, gene_list, list_count, check_list, GM, G1, G2, G3
 				subtmp[[2]] <- as.character(tclvalue(my_math2))
 				enesg <- as.data.frame(matrix(gene_list[[i]][[1]])) 
 				colnames(enesg) <- "gene"
+				cbVal_gene_relative_frequency <- as.character(tclvalue(cbValue_gene_relative_frequency))
 				for(j in 1 : file_count){
 					if(check_list[[i]][j+1] == 1){
 						use_col <- c(use_col, get_color[j])
-						mch <- merge(enesg, master[[j]], by="gene", sort=F)
+						mch <- merge(enesg, master[[j]], by="gene", sort=FALSE)
+						if(cbVal_gene_relative_frequency == 1){
+						  mch[ , -1] <- mch[ , -1]/rowSums(mch[ , -1], na.rm = TRUE)
+						}
 						my_data <- my_apply(mch[,-1])
-						apply_bins <- c(apply_bins, my_data)
+						if(as.character(tclvalue(cbValue_log2)) == 1){
+						  mylog <- c(mylog, 1)
+						  mch[is.na(mch)] <- 0
+						  bbb <- min(mch[,-1][mch[,-1]>0])/2
+						  my_data <- (sapply(my_data, function(x){replace(x, x == 0, bbb)}))
+						  apply_bins <- c(apply_bins, log2(my_data))
+						}  else {
+						  mylog <- c(mylog, 0)
+						  apply_bins <- c(apply_bins, my_data)
+						}
+						
 						num <- NULL
 						setdot <- OPTIONS_LIST[[i]][[j]][1]
 						num <- which(my_dotlist == setdot)
@@ -1213,7 +1615,6 @@ Setup_Test <- function(master, gene_list, list_count, check_list, GM, G1, G2, G3
 						}
 						mydots <- c(mydots, num)
 						mylines <- c(mylines, num2)
-						mylog <- c(mylog, OPTIONS_LIST[[i]][[j]][3])
 						tmp <- c(tmp, tmptot[j])
 						apply_count <- apply_count + 1
 					}
@@ -1224,7 +1625,8 @@ Setup_Test <- function(master, gene_list, list_count, check_list, GM, G1, G2, G3
 			return()
 		}
 		HandlePlotMods(apply_count, apply_bins, num_bins, norm_bin, 
-			tmp, subtmp, use_col, startbin, stopbin, ylim, ylimt, minylimbox, maxylimbox, mydots, mylines, mylog)
+			tmp, subtmp, use_col, startbin, stopbin, ylim, ylimt, minylimbox, 
+			maxylimbox, mydots, mylines, mylog)
 	}
 		}else{
 		  return()
@@ -1237,33 +1639,39 @@ HandlePlotMods <- function(apply_count, apply_bins, num_bins, nbin,
 		R_start_bin <- as.integer(tclvalue(startbin))
 		R_stop_bin <- as.integer(tclvalue(stopbin))
 		cbVal_relative_frequency <- as.character(tclvalue(cbValue_relative_frequency))
+		cbVal_gene_relative_frequency <- as.character(tclvalue(cbValue_gene_relative_frequency))
+		cbVal_log2 <- as.character(tclvalue(cbValue_log2))
 		R_norm_bin <- as.numeric(tclvalue(nbin))
 		normz <- 1
 		ylim_set <- NULL
 		apply_plot <- NULL
 		apply_sample <- NULL
 		use_bins <- R_stop_bin - R_start_bin + 1
+		my_mult <- 1.2
 		if(cbVal_relative_frequency == 1){
 			subtmp[[2]] <- paste(subtmp[[2]], "Relative Frequency", sep=" - ")
+		}
+		if(cbVal_gene_relative_frequency == 1){
+		  subtmp[[2]] <- paste(subtmp[[2]], "Gene RF", sep=" - ")
+		}
+		if(cbVal_log2 == 1){
+		  subtmp[[2]] <- paste(subtmp[[2]], "Log2", sep=" - ")
+		  my_mult <- 0.8
 		}
 		if(!is.na(R_norm_bin) & R_norm_bin > 0 & R_norm_bin <= num_bins){
 			subtmp[[2]] <- paste(subtmp[[2]], " - Normalized to bin ", R_norm_bin)
 		}
 		for(i in 1:apply_count){ 
 			if(cbVal_relative_frequency == 1){
-				normz <- sum(apply_bins[(num_bins*(i-1)+1):(num_bins*i)])
+				normz <- sum(abs(apply_bins[(num_bins*(i-1)+1):(num_bins*i)]))
 			}
 			if(!is.na(R_norm_bin) & R_norm_bin > 0 & R_norm_bin <= num_bins){
 				normz <-(apply_bins[((num_bins * (i-1)) + floor(R_norm_bin))] + apply_bins[((num_bins * (i-1)) + ceiling(R_norm_bin))])/2
 			}
-			if(mylog[i] == "0"){
-				if(normz == 0){
-					normz <- 1
-				}
-			temp <- (apply_bins[(num_bins*(i-1)+1):(num_bins*i)][R_start_bin:R_stop_bin]) / normz
-			} else {
-			temp <- (apply_bins[(num_bins*(i-1)+1):(num_bins*i)][R_start_bin:R_stop_bin]) - normz
+			if(normz == 0){
+			  normz <- 1
 			}
+			temp <- (apply_bins[(num_bins*(i-1)+1):(num_bins*i)][R_start_bin:R_stop_bin]) / normz
 			apply_plot <- c(apply_plot, temp)
 		}
 		if(length(apply_plot) < 1){
@@ -1272,7 +1680,7 @@ HandlePlotMods <- function(apply_count, apply_bins, num_bins, nbin,
 		}
 		if(ylimt[3] == 0 | is.na(ylim[1]) | is.na(ylim[2])){
 			ymin <- round(min(apply_plot),digits=5) 
-			ymax <- round(max(apply_plot)*1.2, digits=5)
+			ymax <- round(max(apply_plot)*my_mult, digits=5)
 			ylim_set  <- c(ymin,ymax)
 			ylimt[1] <- tclVar(ymin)
 			ylimt[2] <- tclVar(ymax)
@@ -1288,20 +1696,21 @@ HandlePlotMods <- function(apply_count, apply_bins, num_bins, nbin,
 		LineDotPlot(apply_plot, use_bins, ylim_set, Colors, tmp, subtmp, apply_count, R_start_bin, R_stop_bin, mydots, mylines)
 	}
 
-#line and dot plot function
+# line and dot plot function
 LineDotPlot <- function(apply_plot, use_bins, ylim, Colors, use_legend, subtmp, pcount, 
 	R_start_bin, R_stop_bin, mydots, mylines) {
 		par(mar=c(5.1, 5.5, 4.1, 4.1), xpd=FALSE)  
 		L_loc <- as.character(tclvalue(Legend_loc2))
 		if(L_loc == "outside"){
-			par(mar=c(5.1, 5.5, 4.1, 10.1))
+		  par(mar=c(5.1, 5.5, 4.1, 4.1)) # par(mar=c(5.1, 5.5, (4.1 + pcount), 4.1))
 		}
 		plot(1, type="n", axes=F, ylim=ylim, xlim=c(1, use_bins), ann=FALSE)
 		### plot points 
 		for(i in 1:pcount){ 
 		  my_score <- apply_plot[(use_bins*(i-1)+1):(use_bins*i)]
+		  # change to type="l" for not dots
 			points(my_score, type="o",col=Colors[i] ,pch=mydots[i], 
-				cex = 1.5, lwd=3, lty=mylines[i])
+				cex = 1.2, lwd=5, lty=mylines[i])
 			if(mylines[i]==0){
         
 			  #GENE_LIST[[1]][[8]] <<- c(GENE_LIST[[1]][[8]], apply_plot[(use_bins*(i-1)+1):(use_bins*i)])
@@ -1334,7 +1743,7 @@ LineDotPlot <- function(apply_plot, use_bins, ylim, Colors, use_legend, subtmp, 
 		cex <- as.numeric(tclvalue(Legend_size))
 		if(L_loc == "outside"){
 			par(xpd=TRUE)# works on outside location
-			legend((use_bins + use_bins*0.05),ylim[2], use_legend, bty = "n", cex = cex, pch = mydots, col = Colors, text.col = Colors) 
+		  legend(.5,(ylim[2] + ylim[2]*.05+(ylim[2]*.05*pcount)), use_legend, bty = "n", cex = cex, pch = mydots, col = Colors, text.col = Colors) 
 		} else {
 			legend(L_loc, use_legend, bty = "n", cex = cex, pch = mydots, col = Colors, text.col = Colors) 
 		}
@@ -1342,66 +1751,54 @@ LineDotPlot <- function(apply_plot, use_bins, ylim, Colors, use_legend, subtmp, 
 		PlotFormat(R_start_bin, R_stop_bin)
 	}
 	 
-## plot finishing touches
+# plot finishing touches
 PlotFormat <- function(R_start_bin, R_stop_bin){
 		start_bin_norm <- R_start_bin - 1
 		mystop <- R_stop_bin + .2
 		R_Txt_one <- as.character(tclvalue(Txt_one))
 		R_Pos_one <- as.numeric(tclvalue(Pos_one))
 		if (R_Pos_one > 0 & !is.na(R_Pos_one) & R_Pos_one < mystop) {
-		axis(1, lab = F, at = (-start_bin_norm + R_Pos_one), lwd.ticks = 2.1, col = "green")
-		mtext(R_Txt_one, side = 1, at = (-start_bin_norm + R_Pos_one), line = 1, col = "green")
-			abline(col="green", v=(-start_bin_norm + R_Pos_one), lwd = 2, lty = 3)
+		axis(1, lab = F, at = (-start_bin_norm + R_Pos_one), lwd.ticks = 5, col = "green")
+		mtext(R_Txt_one, side = 1, at = (-start_bin_norm + R_Pos_one), line = 1.2, cex = 1.5, col = "green")
+			abline(col="green", v=(-start_bin_norm + R_Pos_one), lwd = 5, lty = 3)
 		}
 		R_Txt_two <- as.character(tclvalue(Txt_two))
 		R_Pos_two <- as.numeric(tclvalue(Pos_two))
 		if (R_Pos_two > 0 & !is.na(R_Pos_two) & R_Pos_two < mystop) {
-		axis(1, lab = F, at = (-start_bin_norm + R_Pos_two), lwd.ticks = 2.1, col = "red")
-		mtext(R_Txt_two, side = 1, at = (-start_bin_norm + R_Pos_two), line = 1, col = "red")
-				abline(col="red", v=(-start_bin_norm + R_Pos_two), lwd = 2, lty = 3)
+		axis(1, lab = F, at = (-start_bin_norm + R_Pos_two), lwd.ticks = 5, col = "red")
+		mtext(R_Txt_two, side = 1, at = (-start_bin_norm + R_Pos_two), line = 1.2, cex = 1.5,col = "red")
+				abline(col="red", v=(-start_bin_norm + R_Pos_two), lwd = 5, lty = 3)
 		}
 		R_Txt_three <- as.character(tclvalue(Txt_three))
 		R_Pos_three <- as.numeric(tclvalue(Pos_three))
 		if (R_Pos_three > 0 & !is.na(R_Pos_three)& R_Pos_three < mystop) {
-		axis(1, lab = F, at = (-start_bin_norm + R_Pos_three), lwd.ticks = 2.1, col = "black")
-		mtext(R_Txt_three, side = 1, cex = .8, at = (-start_bin_norm + R_Pos_three), 
-			line = .8, col = "black")
-				abline(col="black", v=(-start_bin_norm + R_Pos_three), lwd = 2, lty = 2)
+		axis(1, lab = F, at = (-start_bin_norm + R_Pos_three), lwd.ticks = 5, col = "black")
+		mtext(R_Txt_three, side = 1, cex = 1.5, at = (-start_bin_norm + R_Pos_three), 
+			line = 1.2, col = "black")
+				abline(col="black", v=(-start_bin_norm + R_Pos_three), lwd = 5, lty = 3)
 		}
 		R_Txt_four <- as.character(tclvalue(Txt_four))
 		R_Pos_four <- as.numeric(tclvalue(Pos_four))
 		if (R_Pos_four > 0 & !is.na(R_Pos_four)& R_Pos_four < mystop) {
-		axis(1, lab = F, at = (-start_bin_norm + R_Pos_four), lwd.ticks = 2.1, col = "black")
-		mtext(R_Txt_four, side=1, at = (-start_bin_norm + R_Pos_four), line = .8, cex = .8, col = "black")
-				abline(col="black", v=(-start_bin_norm + R_Pos_four), lwd = 2, lty = 2)
+		axis(1, lab = F, at = (-start_bin_norm + R_Pos_four), lwd.ticks = 5, col = "black")
+		mtext(R_Txt_four, side=1, at = (-start_bin_norm + R_Pos_four), line = 1.2, cex = 1.5, col = "black")
+				abline(col="black", v=(-start_bin_norm + R_Pos_four), lwd = 5, lty = 3)
 		}
-		R_Txt_five <- as.character(tclvalue(Txt_five))
-		R_Pos_five <- as.numeric(tclvalue(Pos_five))
-		if (R_Pos_five > 0 & !is.na(R_Pos_five)& R_Pos_five < mystop) {
-		axis(1, lab = F, at = (-start_bin_norm + R_Pos_five), lwd.ticks = 2.1, col = "black")
-		mtext(R_Txt_five, side=1, at = (-start_bin_norm + R_Pos_five), line = .8, cex = .8, col = "black")
+		use.pos.plot.ticks <- Destring(unlist(strsplit(tclvalue(Pos_five), " ")))
+		use.pos.plot.ticks[is.na(use.pos.plot.ticks)] <- 0
+		use.label.plot.ticks <- unlist(strsplit(tclvalue(Txt_five), " "))
+		use.label.plot.ticks <- use.label.plot.ticks[use.pos.plot.ticks > start_bin_norm]
+		use.pos.plot.ticks <- use.pos.plot.ticks[use.pos.plot.ticks > start_bin_norm]
+		if (length(use.label.plot.ticks) != length(use.pos.plot.ticks)) {
+		  tkmessageBox(message = "The number of Positions and labels are unequal")
+		  return ()
 		}
-		R_Txt_six <- as.character(tclvalue(Txt_six))
-		R_Pos_six <- as.numeric(tclvalue(Pos_six))
-		if (R_Pos_six > 0 & !is.na(R_Pos_six)& R_Pos_six < mystop) {
-		axis(1, lab = F, at = (-start_bin_norm + R_Pos_six), lwd.ticks = 2.1, col = "black")
-		mtext(R_Txt_six, side=1, at = (-start_bin_norm + R_Pos_six), line = .8, cex = .8, col = "black")
-		}
-		R_Txt_seven <- as.character(tclvalue(Txt_seven))
-		R_Pos_seven <- as.numeric(tclvalue(Pos_seven))
-		if (R_Pos_seven > 0 & !is.na(R_Pos_seven)& R_Pos_seven < mystop) {
-		axis(1, lab = F, at = (-start_bin_norm + R_Pos_seven), lwd.ticks = 2.1, col = "black")
-		mtext(R_Txt_seven, side=1, at = (-start_bin_norm + R_Pos_seven), line = .8, cex = .8, col = "black")
-		}
-		R_Txt_eight <- as.character(tclvalue(Txt_eight))
-		R_Pos_eight <- as.numeric(tclvalue(Pos_eight))
-		if (R_Pos_eight > 0 & !is.na(R_Pos_eight)& R_Pos_eight < mystop) {
-		axis(1, lab = F, at = (-start_bin_norm + R_Pos_eight), lwd.ticks = 2.1, col = "black")
-		mtext(R_Txt_eight, side=1, at = (-start_bin_norm + R_Pos_eight), line = .8, cex = .8, col = "black")
-		}
+		
+		axis(1, lab = F, at = (-start_bin_norm + use.pos.plot.ticks), lwd.ticks = 5, col = "black")
+		mtext(use.label.plot.ticks, side=1, at = (-start_bin_norm + use.pos.plot.ticks), line = 1.2, cex = 1.5, col = "black")
 	}
 
-	#sets up Master list to plot from new list	
+# sets up Master list to plot from new list	
 handleGenePlot <- function(MGL, MGLC){ # add state5
 	if(as.integer(tksize(MGL)) > 0){
 		gene_list <- list(list(),list(),list(),list(),list())
@@ -1416,7 +1813,7 @@ handleGenePlot <- function(MGL, MGLC){ # add state5
 		return()
 		}
 		
-#sets up Master list from selected genes to plot from new list		
+# sets up Master list from selected genes to plot from new list		
 handleGenePlot2 <- function(MGL, MGLC){ #add state5
 			GL0 <- tklistbox(mainframe, height = 4, width = 35, selectmode = "single",  background = "white")
 			num <- (as.integer(tkcurselection(MGL)))
@@ -1441,7 +1838,7 @@ handleGenePlot2 <- function(MGL, MGLC){ #add state5
 			return()
 		}
 		
-#saves selected gene list to a file
+# saves selected gene list to a file
 SaveGenelist <- function(genelist){
 		gene_count <- as.integer(tksize(genelist))
 		if(gene_count > 0 & BusyTest()){
@@ -1465,7 +1862,7 @@ SaveGenelist <- function(genelist){
 		return()
 	}
 
-	#removes selected item(s) from list
+# removes selected item(s) from list
 RemoveLst<-function(lst1,lst1c){ #do I use this?
 	num <- (as.integer(tkcurselection(lst1)))
 	if(length(num) < 1){
@@ -1481,66 +1878,20 @@ RemoveLst<-function(lst1,lst1c){ #do I use this?
 	tkinsert(lst1c, "end", lstcount)
 }
 
-OnOK <- function(){ 
-	j <- as.integer(tkcurselection(mylist))
-	if(length(j) < 1){
-		j <- 0
-	}
-	Name <-  as.character(tclvalue(tkget(mylist,j)))
-	if(Name == "543 bins 10,10,10"){
-		Txt_five <<- tclVar('-450')
-		Txt_six <<- tclVar('+450')
-		Pos_one <<- tclVar(5.5)
-		Pos_two <<- tclVar(25.5)
-		Pos_three <<- tclVar(10.5)
-		Pos_four <<- tclVar(20.5)
-		Pos_five <<- tclVar(1)
-		Pos_six <<- tclVar(30)
-	} else if(Name == "543 bins 20,20,20"){
-		Txt_five <<- tclVar('-450')
-		Txt_six <<- tclVar('+450')
-		Pos_one <<- tclVar(10.5)
-		Pos_two <<- tclVar(50.5)
-		Pos_three <<- tclVar(20.5)
-		Pos_four <<- tclVar(40.5)
-		Pos_five <<- tclVar(1)
-		Pos_six <<- tclVar(60)
-	} else if(Name == "5 .5k-1.5k"){
-		Txt_five <<- tclVar('-450')
-		Txt_six <<- tclVar('+1450')
-		Pos_one <<- tclVar(5.5)
-		Pos_two <<- tclVar(0)
-		Pos_three <<- tclVar(0)
-		Pos_four <<- tclVar(0)
-		Pos_five <<- tclVar(1)
-		Pos_six <<- tclVar(20)
-	}else if(Name == "5 1.5k-2k 70 bins"){
-		Txt_five <<- tclVar('-1450')
-		Txt_six <<- tclVar('+1950')
-		Pos_one <<- tclVar(30.5)
-		Pos_two <<- tclVar(0)
-		Pos_three <<- tclVar(0)
-		Pos_four <<- tclVar(0)
-		Pos_five <<- tclVar(1)
-		Pos_six <<- tclVar(70)
-	}
-	#tkdestroy(tt)  # if destryed swapFrame() linked to button does not work
-
-	
-	mainframe <<- tktoplevel() #container for it all
+mainframe <- tktoplevel() #container for it all
 	tcl("wm", "attributes", mainframe, topmost = TRUE)
-	tcl('wm', "resizable", mainframe, F, F)
+	# tcl('wm', "resizable", mainframe, F, F)
 	tkwm.title(mainframe, my_version_num)
 	box1 <- tkframe(mainframe, relief='ridge', borderwidth = 5) #frame for top half
 		box1a <- tkframe(box1, relief='ridge', borderwidth = 5) #frame for top right 1/2
 			b1a1 <- tkframe(box1a) #frame for file list and scroll bars
-			main_list <<- tklistbox(b1a1, height = 1, width = 38, relief = 'flat', background = 'gray93')
+			main_list <- tklistbox(b1a1, height = 1, width = 38, relief = 'flat', background = 'gray93')
 					tkpack(main_list)	
 					tkinsert(main_list, 0, "                     List of table files")
 				b1a1a <- tkframe(b1a1) 
 					yscrb1a1a <- tkscrollbar(b1a1a, repeatinterval = 5, command = function(...) 
 						tkyview(file_list, ...))
-					file_list <<- tklistbox(b1a1a, height = 5,width = 38, selectmode = "single",
+					file_list <- tklistbox(b1a1a, height = 5,width = 38, selectmode = "single",
 						yscrollcommand = function(...) tkset(yscrb1a1a, ...),background = "white")
 					tkpack(file_list, side = "left")
 					tkbind(file_list,"<Double-ButtonPress-1>",function() handleColorSel(file_list, 1))
@@ -1552,7 +1903,7 @@ OnOK <- function(){
 					ActLst(file_list, active_list, ' genes in common ', active_lable, c(1, 0)))
 				button_TopGeneList <- tkbutton(b1a3, text = " plot labels ", command = function() linePlotOptions())
 				tkpack(button_SortGeneList, button_TopGeneList, side = 'left', padx = c(5, 0), pady = c(0, 0))
-				cb_mainlist <<- tkcheckbutton(b1a3)
+				cb_mainlist <- tkcheckbutton(b1a3)
 				tkconfigure(cb_mainlist, variable = tclVar(CHECK_LIST[[1]][1]), command=function() 
 					CHECK_LIST[[1]] <<- HandleMasterCheck(as.integer(tksize(file_list)), CHECK_LIST[[1]], COLOR_LIST[[1]], 
 						cb_mainlist, file_list))
@@ -1560,13 +1911,13 @@ OnOK <- function(){
 				tkpack(cb_mainlist,  side = 'left', padx = c(5, 0), pady = c(0, 0))
 			tkpack(b1a3) 
 			b1a3a <- tkframe(box1a, relief='ridge', borderwidth = 5)# frame for gene count
-					gene_main_count <<- tklistbox(b1a3a, height = 2, width = 40, relief = 'flat',
+					gene_main_count <- tklistbox(b1a3a, height = 2, width = 40, relief = 'flat',
 						background = 'gray93')
 					tkpack(gene_main_count)				
 			tkpack(b1a3a,  side = 'top', padx = c(0, 0), pady = c(0, 0))
 			b1a4 <- tkframe(box1a) #frame for buttons
 				button_GetTableFile <- tkbutton(b1a4, text = "  Load Table File(s)  ", command=function() 
-					FILE_LIST <<- GetTableFile(FILE_LIST, G1_main, file_list, gene_list0,	gene_list1, gene_list2, 
+					GetTableFile(FILE_LIST, G1_main, file_list, gene_list0,	gene_list1, gene_list2, 
 					gene_list3, gene_main_count, G1C_main, gene_list0_count,	gene_list1_count, gene_list2_count, gene_list3_count))
 				button_ClearTableFile <- tkbutton(b1a4, text = "  Restart   ", command=function() ClearTableFile())
 				tkpack(button_GetTableFile, button_ClearTableFile, padx = c(0, 0), side = 'left')
@@ -1585,21 +1936,25 @@ OnOK <- function(){
 						tkpack(tkwidget(b1a6a1, type ="spinbox", state = "readonly", wrap = TRUE, width = 7, 
 							textvariable = my_math2, values = my_math), side = 'left', padx = c(10, 15)
 								, pady = c(3, 3))
-						cb_relative_frequency <<- tkcheckbutton(b1a6a1)
+						cb_relative_frequency <- tkcheckbutton(b1a6a1)
+						cb_gene_relative_frequency <- tkcheckbutton(b1a6a1)
 						tkconfigure(cb_relative_frequency, variable = cbValue_relative_frequency)
-						tkpack(tklabel(b1a6a1, text = '   Relative Frequency '), cb_relative_frequency,	
-							side = 'left', padx = c(0, 0))
+						tkconfigure(cb_gene_relative_frequency, variable = cbValue_gene_relative_frequency)
+						tkpack(tklabel(b1a6a1, text = 'Relatve Frequency: Bin, Gene'), cb_relative_frequency,	
+						       cb_gene_relative_frequency, side = 'left', padx = c(0, 0))
 					tkpack(b1a6a1, padx = c(0, 0), pady = c(0, 0), side = 'top')
 					b1a6a2 <- tkframe(b1a6a)
-						tkpack(tklabel(b1a6a2, text = 'Norm to bin'), side = 'left',padx = c(5, 0))
+					  tkpack(cb_log2 <- tkcheckbutton(b1a6a ,text = "log2"), side = 'left')
+					  tkconfigure(cb_log2, variable = cbValue_log2)
+						tkpack(tklabel(b1a6a2, text = 'Norm bin'), side = 'left',padx = c(5, 0))
 						tkpack(tkentry(b1a6a2, width = 2, textvariable = norm_bin), side = 'left', 
 							padx = c(0, 3), pady = c(0, 0))
 						tkpack(tklabel(b1a6a2, text = ' Bins to plot'),side = 'left', padx = c(20, 3), 
 							pady = c(0, 0))
-						start_box <<- tkentry(b1a6a2, width = 2, textvariable = start_bin)
+						start_box <- tkentry(b1a6a2, width = 2, textvariable = start_bin)
 						tkpack(start_box, side = 'left', padx = c(0, 0), pady = c(0, 0))
 						tkpack(tklabel(b1a6a2, text = '- '),side = 'left', padx = c(0, 0), pady = c(5, 0))			
-						stop_box <<- tkentry(b1a6a2, width = 2, textvariable = stop_bin)
+						stop_box <- tkentry(b1a6a2, width = 2, textvariable = stop_bin)
 						tkpack(stop_box, side = 'left', padx = c(0, 5), pady = c(0, 0))
 					tkpack(b1a6a2, pady = c(0, 0), side = 'top')
 				tkpack(b1a6a, side = 'left', padx = c(0, 0), pady = c(0, 0))
@@ -1610,10 +1965,10 @@ OnOK <- function(){
 				b1b1a <- tkframe(b1b1)  
 					b1b1a1 <- tkframe(b1b1a, relief='ridge', borderwidth = 5)
 						b1b1a1a <- tkframe(b1b1a1) # frame for lists and scroll bars
-							active_lable <<- tklistbox(b1b1a1, height = 1, width = 38, relief = 'flat', 
+							active_lable <- tklistbox(b1b1a1, height = 1, width = 38, relief = 'flat', 
 								background = 'grey93')
 							tkinsert(active_lable,0,"                     No Active table files")
-							active_list <<- tklistbox(b1b1a1a, height = 2, width = 40, selectmode = "single",  
+							active_list <- tklistbox(b1b1a1a, height = 2, width = 40, selectmode = "single",  
 								background = "white")
 							tkpack(active_lable, side = "top", pady = c(0, 0), padx = c(0, 0))
 							tkpack(active_list, side = "left", pady = c(0, 0), padx = c(0, 0))
@@ -1637,10 +1992,10 @@ OnOK <- function(){
 						b2g1b1 <- tkframe(b1b2a1)
 							yscrb2g1b1 <- tkscrollbar(b2g1b1, repeatinterval = 5, command = function(...)
 								tkyview(G1_main, ...))
-							G1_main <<- tklistbox(b2g1b1, height = 8, width = 38, 
+							G1_main <- tklistbox(b2g1b1, height = 8, width = 38, 
 								selectmode = "extended", xscrollcommand = function(...) tkset(xscrb2g1b1, ...), 
 								yscrollcommand = function(...) tkset(yscrb2g1b1, ...), background = "white")
-							G1C_main <<- tklistbox(b1b2a1, height = 2, width = 38, relief = 'flat', 
+							G1C_main <- tklistbox(b1b2a1, height = 2, width = 38, relief = 'flat', 
 								background = 'gray93')
 							tkpack(G1C_main, pady = c(0, 0), padx = c(0, 0))
 							tkpack(G1_main, side = "left", pady = c(0, 0), padx = c(0, 0))
@@ -1661,7 +2016,7 @@ OnOK <- function(){
 	tkpack(box1)
 			
 		#bottom half frame for all the gene table files
-		makeListFrame <<- function(...){
+		makeListFrame <- function(...){
 			box2l <<- tkframe(mainframe, relief='ridge', borderwidth = 5)
 				box2la <- tkframe(box2l)		
 					b2la1 <- tkframe(box2la, relief='ridge', borderwidth = 5)
@@ -1784,17 +2139,18 @@ OnOK <- function(){
 		tkconfigure(cb_mainlist4, variable = tclVar(CHECK_LIST[[5]][1]), command=function() 
 			CHECK_LIST[[5]] <<- HandleMasterCheck(as.integer(tksize(file_list)), CHECK_LIST[[5]], COLOR_LIST[[5]], 
 				cb_mainlist4, gene_list3))
+		UpdateFileLists(as.integer(tksize(file_list)), NULL, file_list, gene_list0,	gene_list1, gene_list2, gene_list3, 
+		                gene_main_count, gene_list0_count,	gene_list1_count, gene_list2_count, gene_list3_count, c(1:4), FALSE, 0)
 		}
-		makeListFrame()
 		
 		#bottom half frame for all the Gene tools
-		makeGeneFrame <<- function(...){
+		makeGeneFrame <- function(...){
 			stop_bin1 <<-  tclVar(as.integer(tclvalue(stop_bin)))
 			one_bin2 <<- tclVar(as.integer(tclvalue(stop_bin)))
-			up_bin1 <<- tclVar(as.integer(tclvalue(Pos_one))-1)
-			up_bin2 <<- tclVar(as.integer(tclvalue(Pos_one))+3)
-			down_bin1 <<- tclVar(as.integer(tclvalue(Pos_one))+4)
-			down_bin2 <<- tclVar(as.integer(tclvalue(Pos_two)))
+			down_bin1 <<- tclVar(as.integer(tclvalue(Pos_one))-5)
+			down_bin2 <<- tclVar(as.integer(tclvalue(Pos_one))+5)
+			up_bin1 <<- tclVar(as.integer(tclvalue(Pos_one))+6)
+			up_bin2 <<- tclVar(as.integer(tclvalue(Pos_four)))
 			box2g <<- tkframe(mainframe, relief='ridge', borderwidth = 5)
 			  b2g1 <- tkframe(box2g)
 					b2g1a <- tkframe(b2g1, relief='ridge', borderwidth = 5)
@@ -1812,7 +2168,7 @@ OnOK <- function(){
 							tkpack(stop_box1,side = 'left', padx = c(0, 0), pady = c(0, 0))
 						b2g1a1 <- tkframe(b2g1a)
 							tkpack(tkbutton(b2g1a1,text="  Get gene list(s)   ", command =  function() 
-								SortTop(file_list, active_list, G1_main, G2, G3, G2C, G3C, FILE_LIST, start_bin1,
+								SortTop(file_list, active_list, G1_main, G2, G3, G4, G2C, G3C, G4C, FILE_LIST, start_bin1,
 									start_box1, stop_bin1, stop_box1, my_percent2)), pady = c(0, 0), side = 'bottom')	
 						tkpack(b2g1a0,b2g1a1, padx = c(0, 0), pady = c(0, 0))
 					tkpack(b2g1a, pady = c(0, 0), side = 'top')
@@ -1835,10 +2191,11 @@ OnOK <- function(){
 					tkpack(b2g1b2, padx = c(0, 0), pady = c(0, 0))
 					b2g1b3 <- tkframe(b2g1b)
 						tkpack(tkbutton(b2g1b3,text="  Scatter plot   ", command = function() 
-							plotSOne(file_list, active_list, G1_main, G2, G3, G2C, G3C, FILE_LIST, 
+							plotSOne(file_list, active_list, G1_main, G2, G3, G4, G2C, G3C, G4C, FILE_LIST, 
 								one_bin1, one_box1, one_bin2, one_box2, one_diff, one_box)),pady = c(0, 0), side = 'bottom')
 					tkpack(b2g1b3, padx = c(0, 0), pady = c(0, 0))
-				tkpack(b2g1b, pady = c(0, 0), side = 'bottom')
+				tkpack(b2g1b, pady = c(0, 0), side = 'top')
+				
 				b2g1c <- tkframe(b2g1, relief='ridge', borderwidth = 5)  #frame ratio tool
 					tkpack(tklabel(b2g1c, text = "Compare ratios"), pady = c(0, 3))
 				b2g1c1 <- tkframe(b2g1c)
@@ -1863,26 +2220,53 @@ OnOK <- function(){
 				tkpack(b2g1c3, padx = c(0, 0), pady = c(0, 0))
 				b2g1c4 <- tkframe(b2g1c)
 					tkpack(tkbutton(b2g1c4,text="  Scatter plot   ", command = function() 
-						plotEI(file_list, active_list, G1_main, G2, G3, G2C, G3C, FILE_LIST, 
+						plotEI(file_list, active_list, G1_main, G2, G3, G4, G2C, G3C, G4C, FILE_LIST, 
 							up_bin1, up_box1, up_bin2, up_box2, down_bin1, down_box1, down_bin2, 
 								down_box2, fold_diff, fold_box)),pady = c(0, 0), side = 'bottom')
 				tkpack(b2g1c4, padx = c(0, 0), pady = c(0, 0))
-				tkpack(b2g1c, pady = c(0, 0), side = 'left')
-			tkpack(b2g1)
-				tkpack(b2g1, side = 'left', padx = c(0, 0), pady = c(0, 0))
+				tkpack(b2g1c, pady = c(0, 0), side = 'top')
+				
+				b2g1d <- tkframe(b2g1, relief='ridge', borderwidth = 5)
+				tkpack(tklabel(b2g1d, text = "Get clusters"),pady = c(0, 0))
+				b2g1d0 <- tkframe(b2g1d)
+				tkpack(tklabel(b2g1d0),side = 'left', padx = c(0, 0), pady = c(0, 0))
+				cb_gene_relative_frequency2 <<- tkcheckbutton(b2g1d0)
+				tkpack(tklabel(b2g1d0, text = 'Rel Freq: Gene'), cb_gene_relative_frequency2,
+				       side = 'left', padx = c(0, 0), pady = c(0, 0))
+				tkconfigure(cb_gene_relative_frequency2, variable = cbValue_gene_cluster_relative_frequency)
+				tkpack(tklabel(b2g1d0, text = ' Bins'),side = 'left', padx = c(0, 0), pady = c(0, 0))
+				start_cluster1 <<- tkentry(b2g1d0, width = 2, textvariable = start_bin_cluster)
+				tkpack(start_cluster1, side = 'left', padx = c(0, 0), pady = c(0, 0))
+				tkpack(tklabel(b2g1d0, text = '- '),side = 'left', padx = c(0, 0), pady = c(0, 0))			
+				stop_cluster1 <<- tkentry(b2g1d0, width = 2, textvariable = stop_bin1)
+				tkpack(stop_cluster1, side = 'left', padx = c(0, 0), pady = c(0, 0))
+				b2g1d1 <- tkframe(b2g1d)
+				tkpack(tkbutton(b2g1d1,text="  Get 3 clusters   ", command =  function() 
+				  FindClustersSetUpTest(FILE_LIST, file_list, active_list, G1_main, start_bin_cluster, start_cluster1, 
+				                        stop_bin1, stop_cluster1, start_bin, start_box, stop_bin, stop_box, 
+				                        my_math2, min_ylim, max_ylim, min_ylim_box, 
+				                        max_ylim_box, cbValue_ylim, G2, G3, G4, G2C, G3C, G4C)), 
+				  pady = c(0, 0), side = 'bottom')	
+				tkpack(b2g1d0,b2g1d1, padx = c(0, 0), pady = c(0, 0))
+				tkpack(b2g1d, pady = c(0, 0), side = 'bottom')
+				
+			tkpack(b2g1, side = 'left', padx = c(0, 0), pady = c(0, 0))
+# 			b2g5 <- tkframe(box2g)
+# 			tkpack(tkbutton(b2g5,text="Plot all lists"))
+# 			tkpack(b2g5, side = "bottom")
 				b2g2 <- tkframe(box2g, relief='ridge', borderwidth = 5)
 					b2g2a <- tkframe(b2g2)
-						tkpack(tkbutton(b2g2a,text="  plot list  ", command = function() handleGenePlot(G2, G2C)), side='left', pady = c(5, 5), padx = c(5, 0))
-						tkpack(tkbutton(b2g2a,text="  plot selected  ", command = function() handleGenePlot2(G2, G2C)), side='left', pady = c(5, 5), padx = c(0, 5))
+						tkpack(tkbutton(b2g2a,text="plot list", command = function() handleGenePlot(G2, G2C)), side='left', pady = c(5, 5), padx = c(5, 0))
+						tkpack(tkbutton(b2g2a,text="plot selected", command = function() handleGenePlot2(G2, G2C)), side='left', pady = c(5, 5), padx = c(0, 5))
 					tkpack(b2g2a)
 					b2g2b <- tkframe(b2g2)
 						b2g2b1 <- tkframe(b2g2b)
 							yscrb2g2b1 <- tkscrollbar(b2g2b1, repeatinterval = 5, command = function(...)
 								tkyview(G2, ...))
-							G2 <<- tklistbox(b2g2b1, height = 9, width = 23, selectmode = "extended",
+							G2 <<- tklistbox(b2g2b1, height = 9, width = 20, selectmode = "extended",
 								xscrollcommand = function(...) tkset(xscrb2g2b1, ...), 
 								yscrollcommand = function(...) tkset(yscrb2g2b1, ...), background = "white")
-							G2C <<- tklistbox(b2g2, height = 2, width = 23, relief = 'flat', 
+							G2C <<- tklistbox(b2g2, height = 2, width = 20, relief = 'flat', 
 								background = 'gray93')
 								tkpack(G2C, pady = c(0, 0), padx = c(0, 0))
 								tkpack(G2, side = "left", pady = c(0, 0), padx = c(0, 0))
@@ -1893,24 +2277,25 @@ OnOK <- function(){
 							tkpack(b2g2b1, pady = c(0, 3), side = 'left') 
 						tkpack(b2g2b)
 						b2g2c <- tkframe(b2g2)
-							tkpack(tkbutton(b2g2c,text="  Remove  ", command = function() RemoveLst(G2, G2C)),	tkbutton(b2g2c,text="  Save list  ", command = function() SaveGenelist(G2)), 
-								side='left', pady = c(5, 5), padx = c(5, 5))
+							tkpack(tkbutton(b2g2c,text="Remove", command = function() RemoveLst(G2, G2C)),	
+							       tkbutton(b2g2c,text="Save list", command = function() SaveGenelist(G2)), 
+								side='left', pady = c(5, 5), padx = c(0, 0))
 						tkpack(b2g2c)
 					tkpack(b2g2,  padx = c(0, 0), side='left')
 					b2g3 <- tkframe(box2g, relief='ridge', borderwidth = 5)
 						b2g3a <- tkframe(b2g3)
-							tkpack(tkbutton(b2g3a,text="  plot list  ", command = function() handleGenePlot(G3, G3C)), side='left', pady = c(5, 5), padx = c(5, 0))
-							tkpack(tkbutton(b2g3a,text="  plot selected  ", command = function() handleGenePlot2(G3, G3C)), side='left', pady = c(5, 5), 
+							tkpack(tkbutton(b2g3a,text="plot list", command = function() handleGenePlot(G3, G3C)), side='left', pady = c(5, 5), padx = c(5, 0))
+							tkpack(tkbutton(b2g3a,text="plot selected", command = function() handleGenePlot2(G3, G3C)), side='left', pady = c(5, 5), 
 								padx = c(0, 5))
 						tkpack(b2g3a)
 						b2g3b <- tkframe(b2g3)
 							b2g3b1 <- tkframe(b2g3b)
 								yscrb2g3b1 <- tkscrollbar(b2g3b1, repeatinterval = 5, command = function(...)
 									tkyview(G3, ...))
-								G3 <<- tklistbox(b2g3b1, height = 9, width = 23, selectmode = "extended", 
+								G3 <<- tklistbox(b2g3b1, height = 9, width = 20, selectmode = "extended", 
 									xscrollcommand = function(...) tkset(xscrb2g3b1, ...),
 									yscrollcommand = function(...) tkset(yscrb2g3b1, ...), background = "white")
-								G3C <<- tklistbox(b2g3, height = 2, width = 23, relief = 'flat', background = 'gray93')
+								G3C <<- tklistbox(b2g3, height = 2, width = 20, relief = 'flat', background = 'gray93')
 								tkpack(G3C, pady = c(0, 0), padx = c(0, 0))
 								tkpack(G3, side = "left", pady = c(0, 0), padx = c(0, 0))
 								tkpack(yscrb2g3b1, fill = 'y', side = "left")
@@ -1920,15 +2305,47 @@ OnOK <- function(){
 							tkpack(b2g3b1, pady = c(0, 3), side = 'left') 
 						tkpack(b2g3b)
 						b2g3c <- tkframe(b2g3)
-							tkpack(tkbutton(b2g3c,text="  Remove  ", command = function() RemoveLst(G3, G23)),	tkbutton(b2g3c,text="  Save list  ", command = function() SaveGenelist(G3)), 
-								side='left', pady = c(5, 5), padx = c(5, 5))
+							tkpack(tkbutton(b2g3c,text="Remove", command = function() RemoveLst(G3, G3C)),	
+							       tkbutton(b2g3c,text="Save list", command = function() SaveGenelist(G3)), 
+								side='left', pady = c(5, 5), padx = c(0, 0))
 						tkpack(b2g3c)
 					tkpack(b2g3,  padx = c(0, 0), side='left')
+					b2g4 <- tkframe(box2g, relief='ridge', borderwidth = 5)
+					b2g4a <- tkframe(b2g4)
+					tkpack(tkbutton(b2g4a,text="plot list", command = function() handleGenePlot(G4, G4C)), 
+					       side='left', pady = c(5, 5), padx = c(5, 0))
+					tkpack(tkbutton(b2g4a,text="plot selected", command = function() handleGenePlot2(G4, G4C)), 
+					       side='left', pady = c(5, 5), 
+					       padx = c(0, 5))
+					tkpack(b2g4a)
+					b2g4b <- tkframe(b2g4)
+					b2g4b1 <- tkframe(b2g4b)
+					yscrb2g4b1 <- tkscrollbar(b2g4b1, repeatinterval = 5, command = function(...)
+					  tkyview(G4, ...))
+					G4 <<- tklistbox(b2g4b1, height = 9, width = 20, selectmode = "extended", 
+					                 xscrollcommand = function(...) tkset(xscrb2g4b1, ...),
+					                 yscrollcommand = function(...) tkset(yscrb2g4b1, ...), background = "white")
+					G4C <<- tklistbox(b2g4, height = 2, width = 20, relief = 'flat', background = 'gray93')
+					tkpack(G4C, pady = c(0, 0), padx = c(0, 0))
+					tkpack(G4, side = "left", pady = c(0, 0), padx = c(0, 0))
+					tkpack(yscrb2g4b1, fill = 'y', side = "left")
+					xscrb2g4b1 <- tkscrollbar(b2g4b, repeatinterval = 5, orient = "horizontal",
+					                          command = function(...) tkxview(G4, ...))
+					tkpack(xscrb2g4b1, fill = 'both', side = 'bottom')	
+					tkpack(b2g4b1, pady = c(0, 3), side = 'left') 
+					tkpack(b2g4b)
+					b2g4c <- tkframe(b2g4)
+					tkpack(tkbutton(b2g4c,text="Remove", command = function() RemoveLst(G4, G4C)),	
+					       tkbutton(b2g4c,text="Save list", command = function() SaveGenelist(G4)), 
+					       side='left', pady = c(5, 5), padx = c(0, 0))
+					tkpack(b2g4c)
+					
+					tkpack(b2g4,  padx = c(0, 0), side='left')
 				tkpack(box2g)
 		}
 		
 		#opens options for settings on line plot
-		linePlotOptions <<- function(...){ #needs fixing
+		linePlotOptions <- function(...){ #needs fixing
 			if(BusyTest()){
 				CloseSubWindows(c(2))
 				lineOptionsframe <<- tktoplevel() #container for it all
@@ -1986,34 +2403,34 @@ OnOK <- function(){
 				b1c1b <- tkframe(b1c1, relief='ridge', borderwidth = 5) #box for plot lines and labels
 					tkpack(tklabel(b1c1b, text = "Plot lines"), pady = c(5, 5))
 				b1c1b1 <- tkframe(b1c1b)
-					tkpack(tkentry(b1c1b1, width = 5, textvariable = Txt_one), side = 'left', 
+					tkpack(Box_Txt_one <<- tkentry(b1c1b1, width = 5, textvariable = Txt_one), side = 'left', 
 					padx = c(10, 0), pady = c(5, 0))
 					tkpack(tklabel(b1c1b1, text = 'Pos'), side = 'left', 
 					padx = c(5, 3), pady = c(5, 0))
-					tkpack(tkentry(b1c1b1, width = 4, textvariable = Pos_one), side = 'left',
+					tkpack(Box_Pos_one <<- tkentry(b1c1b1, width = 4, textvariable = Pos_one), side = 'left',
 					padx = c(0, 10), pady = c(5, 0))
 				tkpack(b1c1b1, side = 'top')
 				b1c1b2 <- tkframe(b1c1b)
-					tkpack(tkentry(b1c1b2, width = 5, textvariable = Txt_two), side = 'left', 
+					tkpack(Box_Txt_two <<- tkentry(b1c1b2, width = 5, textvariable = Txt_two), side = 'left', 
 					padx = c(10, 0), pady = c(3, 0))
 					tkpack(tklabel(b1c1b2, text = 'Pos'),side = 'left', 
 					padx = c(5, 3), pady = c(3, 0))
-					tkpack(tkentry(b1c1b2, width = 4, textvariable = Pos_two),side = 'left',
+					tkpack(Box_Pos_two <<- tkentry(b1c1b2, width = 4, textvariable = Pos_two),side = 'left',
 					padx = c(0, 10), pady = c(3, 0))
 				tkpack(b1c1b2, side = 'top')
 				b1c1b3 <- tkframe(b1c1b)
-					tkpack(tkentry(b1c1b3, width = 5, textvariable = Txt_three), side = 'left', 
+					tkpack(Box_Txt_three <<- tkentry(b1c1b3, width = 5, textvariable = Txt_three), side = 'left', 
 					padx = c(10, 0), pady = c(3, 0))
 					tkpack(tklabel(b1c1b3, text = 'Pos'), side = 'left', padx = c(5, 3), pady = c(3, 0))
-					tkpack(tkentry(b1c1b3, width = 4, textvariable = Pos_three),side = 'left',
+					tkpack(Box_Pos_three <<- tkentry(b1c1b3, width = 4, textvariable = Pos_three),side = 'left',
 					padx = c(0, 10), pady = c(3, 0))
 				tkpack(b1c1b3, side = 'top')
 				b1c1b4 <- tkframe(b1c1b)
-					tkpack(tkentry(b1c1b4, width = 5, textvariable = Txt_four), side = 'left', 
+					tkpack(Box_Txt_four <<- tkentry(b1c1b4, width = 5, textvariable = Txt_four), side = 'left', 
 					padx = c(10, 0), pady = c(3, 4))
 					tkpack(tklabel(b1c1b4, text = 'Pos'),side = 'left', 
 					padx = c(5, 3), pady = c(3, 4))
-					tkpack(tkentry(b1c1b4, width = 4, textvariable = Pos_four),side = 'left',
+					tkpack(Box_Pos_four <<- tkentry(b1c1b4, width = 4, textvariable = Pos_four),side = 'left',
 					padx = c(0, 10), pady = c(3, 4))
 				tkpack(b1c1b4, side = 'top')
 				tkpack(b1c1b, side = 'left', padx = c(0, 0), pady = c(0, 0))
@@ -2022,37 +2439,15 @@ OnOK <- function(){
 				b1c2b <- tkframe(b1c2, relief='ridge', borderwidth = 5) #box for more bin labels
 					tkpack(tklabel(b1c2b, text = "Bin labels"), pady = c(4, 3))
 					b1c2b1 <- tkframe(b1c2b)
-						tkpack(tkentry(b1c2b1, width = 5, textvariable = Txt_five), side = 'left', 
-						padx = c(10, 0), pady = c(5, 0))
-						tkpack(tklabel(b1c2b1, text = 'Pos'), side = 'left', 
-						padx = c(5, 3), pady = c(5, 0))
-						tkpack(tkentry(b1c2b1, width = 3, textvariable = Pos_five), side = 'left',
-						padx = c(0, 10), pady = c(5, 0))
+					tkgrid(tkwidget(b1c2b1, type ="spinbox", state = "readonly", wrap = TRUE, width = 20, 
+					                textvariable = my_Pos_Txt2, values = my_Pos_Txt, 
+					                command = function() Pos_Txt(my_Pos_Txt2)), row = 0, 
+					       columnspan = 2, pady = c(5, 10))
+					  tkgrid(tklabel(b1c2b1, text = '  text  '), column = 0, row = 1)
+						tkgrid(Box_Txt_five <<- tkentry(b1c2b1, width = 35, textvariable = Txt_five), column = 1, row = 1)
+						tkgrid(tklabel(b1c2b1, text = '  Pos  '), row = 2)
+						tkgrid(Box_Pos_five <<- tkentry(b1c2b1, width = 35, textvariable = Pos_five), column = 1, row = 2)
 					tkpack(b1c2b1, side = 'top')
-					b1c2b2 <- tkframe(b1c2b)
-						tkpack(tkentry(b1c2b2, width = 5, textvariable = Txt_six), side = 'left', 
-						padx = c(10, 0), pady = c(5, 0))
-						tkpack(tklabel(b1c2b2, text = 'Pos'), side = 'left', 
-						padx = c(5, 3), pady = c(5, 0))
-						tkpack(tkentry(b1c2b2, width = 3, textvariable = Pos_six), side = 'left',
-						padx = c(0, 10), pady = c(5, 0))
-					tkpack(b1c2b2, side = 'top')
-					b1c2b3 <- tkframe(b1c2b)
-						tkpack(tkentry(b1c2b3, width = 5, textvariable = Txt_seven), side = 'left', 
-						padx = c(10, 0), pady = c(5, 0))
-						tkpack(tklabel(b1c2b3, text = 'Pos'), side = 'left', 
-						padx = c(5, 3), pady = c(5, 0))
-						tkpack(tkentry(b1c2b3, width = 3, textvariable = Pos_seven), side = 'left',
-						padx = c(0, 10), pady = c(5, 0))
-					tkpack(b1c2b3, side = 'top')
-					b1c2b4 <- tkframe(b1c2b)
-						tkpack(tkentry(b1c2b4, width = 5, textvariable = Txt_eight), side = 'left', 
-						padx = c(10, 0), pady = c(5, 5))
-						tkpack(tklabel(b1c2b4, text = 'Pos'), side = 'left', padx = c(5, 3), 
-						pady = c(5, 5))
-						tkpack(tkentry(b1c2b4, width = 3, textvariable = Pos_eight), side = 'left',
-						padx = c(0, 10), pady = c(5, 5))
-					tkpack(b1c2b4, side = 'top')
 				tkpack(b1c2b, side = 'left', padx = c(0, 0), pady = c(0, 0))	  
 				tkpack(b1c2, side = 'top') 
 				tkpack(tkbutton(box1c,text="  Plot  ", command = function() Setup_Test(FILE_LIST, GENE_LIST, c(1:5), CHECK_LIST, file_list, gene_list0, gene_list1, gene_list2, 
@@ -2064,17 +2459,17 @@ OnOK <- function(){
 				return()
 			}
 		}			
-}
 
-tkpack(tklabel(tt,text="Set Starting state"))
-OK_but <- tkbutton(tt,text="   OK   ",command=OnOK)
-tkpack(OK_but, side = "bottom")
-yscr <- tkscrollbar(tt, repeatinterval = 5, command = function(...)	tkyview(mylist, ...))
-mylist <- tklistbox(tt, height = 5,width = 30, selectmode="single",	background = "white", 
-	yscrollcommand = function(...) tkset(yscr, ...))
-tkinsert(mylist, 0, "543 bins 20,20,40", "5 1.5k-2k 70 bins", "543 bins 10,10,10", "543 bins 20,20,20", "5 .5k-1.5k")
-tkpack(mylist, pady = c(10, 10), padx = c(10, 10), side = "left")
-tkpack(yscr, fill = 'y', side = "left")
+
+# tkpack(tklabel(tt,text="Set Starting state"))
+# OK_but <- tkbutton(tt,text="   OK   ",command=OnOK)
+# tkpack(OK_but, side = "bottom")
+# yscr <- tkscrollbar(tt, repeatinterval = 5, command = function(...)	tkyview(mylist, ...))
+# mylist <- tklistbox(tt, height = 5,width = 30, selectmode="single",	background = "white", 
+# 	yscrollcommand = function(...) tkset(yscr, ...))
+# tkinsert(mylist, 0, "543 bins 20,20,40", "5 1.5k-2k 70 bins", "543 bins 10,10,10", "543 bins 20,20,20", "5 .5k-1.5k")
+# tkpack(mylist, pady = c(10, 10), padx = c(10, 10), side = "left")
+# tkpack(yscr, fill = 'y', side = "left")
 
 
 swapFrame <- function(){ 
@@ -2085,15 +2480,14 @@ swapFrame <- function(){
 		STATE[1] <<- 1
 		#tkconfigure(cb_mainlist, state = "disabled")
 		tkdestroy(box2l)
-		makeGeneFrame()
+		return(makeGeneFrame())
 		#makeGeneFrame(STATE[6])
 	}else if (STATE[1] == 1 & STATE[5] == 0){
 		STATE[1] <<- 0
 		tkdestroy(box2g)
-		makeListFrame()
 		#tkconfigure(cb_mainlist, state = "normal")
-		UpdateFileLists(as.integer(tksize(file_list)), NULL, file_list, gene_list0,	gene_list1, gene_list2, gene_list3, 
-			gene_main_count, gene_list0_count,	gene_list1_count, gene_list2_count, gene_list3_count, c(1:4), FALSE, 0)
+		return(makeListFrame())
 	}
-	return()
 }
+
+makeListFrame()
