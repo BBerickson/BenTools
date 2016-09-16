@@ -44,8 +44,8 @@ kFoldList <- round(c(1, seq(1.1, 2, by = 0.2), 2, seq(2.1, 4, by = 0.2), 4), dig
 # plot lines and ticks with labels
 list_plot_lines <- list("543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
                         "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5),
-                        "5 prim 2k 2k 40bins" = c(20.5, "", "", ""),
-                        "5 prim 1k 1k 80bins" = c(40.5, "", "", ""))
+                        "5 prim 2k 2k 40bins" = c(20.5, 0, 0, 0),
+                        "5 prim 1k 1k 80bins" = c(40.5, 0, 0, 0))
 list_plot_ticks <- list("543 bins 20,20,40" = 
   list('name' = c('-1450 -950 -450 +450 +950 +1450 +1950 +2450 +2950 +3450'),
         'loc' = c(1, 6, 11, 50, 55, 60, 65, 70, 75, 80)),
@@ -1288,6 +1288,7 @@ ApplyMath <- function(list_wide_data_frame, use_col, use_dot, use_line, use_size
                        Destring(tclvalue(tcl_pos_three_line)), 
                        Destring(tclvalue(tcl_pos_four_line)),
                        use_pos_plot_ticks)
+  use_plot_breaks[use_plot_breaks == 0] <- NA
   
   use_plot_breaks_labels <- c(tclvalue(tcl_one_tss_tts_option), 
                               tclvalue(tcl_two_tss_tts_option),

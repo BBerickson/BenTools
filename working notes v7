@@ -32,3 +32,4 @@ fix zoomin main plot yaxis
 added quantiles to cluster tab
 added in options to split gene out list on ; + - |
 updated numbers on dropdown lists
+Update switching plot lines in Options now updates the bin tabs in the tools
