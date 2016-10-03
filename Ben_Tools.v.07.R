@@ -46,22 +46,34 @@ list_plot_lines <- list("543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
                         "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5),
                         "5 prim 2k 2k 40bins" = c(20.5, 0, 0, 0),
                         "5 prim 1k 1k 80bins" = c(40.5, 0, 0, 0))
+
 list_plot_ticks <- list("543 bins 20,20,40" = 
-  list('name' = c('-1450 -950 -450 +450 +950 +1450 +1950 +2450 +2950 +3450'),
+  list('name' = c('-1450 -950 -450 450 950 1450 1950 2450 2950 3450'),
         'loc' = c(1, 6, 11, 50, 55, 60, 65, 70, 75, 80)),
                         "543 bins 10,10,10" = 
-  list('name' = c('-450', '+450'),
+  list('name' = c('-450', '450'),
          'loc' = c(1,30)),
   "5 prim 2k 2k 40bins" = 
-    list('name' = c('-2000', '-1000', '-500', '500', '100', '2000'),
+    list('name' = c('-2000', '-1000', '-500', '500', '1000', '2000'),
          'loc' = c(1, 10, 15, 25, 30, 40)),
   "5 prim 1k 1k 80bins" = 
     list('name' = c('-1000', '-500', '500', '1000'),
          'loc' = c(1, 20, 60, 80)))
+
 tss_tts_options <- c('TSS', 'PolyA', '500', '500')
  
 
 # tcl starting values ----
+tcl_tss_start_bin <- tclVar(1)
+tcl_tss_start_label <- tclVar(-1450)
+tcl_tss_num_bp <- tclVar(500)
+tcl_tss_size_bin <- tclVar(100) 
+tcl_tss_number_entry <- tclVar(3)
+tcl_tts_start_bin <- tclVar(50)
+tcl_tts_start_label <- tclVar(450)
+tcl_tts_num_bp <- tclVar(500)
+tcl_tts_size_bin <- tclVar(100) 
+tcl_tts_number_entry <- tclVar(7)
 tcl_commonfile <- tclVar("All common genes")
 tcl_gene1file <- tclVar("gene1")
 tcl_gene2file <- tclVar("gene2")
@@ -149,7 +161,8 @@ OpenWindowControl <- function(){
     tkraise(root)
   } else if(STATE[1] == 4){
     STATE[1] <<- 0
-    tkdestroy(OptionsFrame)
+    print("close OptionsFrame")
+    #tkdestroy(OptionsFrame)
     tkraise(root)
   }
   if(STATE[1] == 2){
@@ -162,6 +175,73 @@ OpenWindowControl <- function(){
 OnDestroy <- function(){
   STATE[1] <<- 0
   tkraise(root)
+}
+
+# helper for filling up lines and positons entries
+LableMaker <- function(){
+  tss_start_bin <- as.numeric(tclvalue(tcl_tss_start_bin))
+  tss_start_label <- as.numeric(tclvalue(tcl_tss_start_label))
+  tss_num_bp <- as.numeric(tclvalue(tcl_tss_num_bp))
+  tss_size_bin <- as.numeric(tclvalue(tcl_tss_size_bin))
+  tss_number_entry <- as.numeric(tclvalue(tcl_tss_number_entry))
+  tts_start_bin <- as.numeric(tclvalue(tcl_tts_start_bin))
+  tts_start_label <- as.numeric(tclvalue(tcl_tts_start_label))
+  tts_num_bp <- as.numeric(tclvalue(tcl_tts_num_bp))
+  tts_size_bin <- as.numeric(tclvalue(tcl_tts_size_bin)) 
+  tts_number_entry <- as.numeric(tclvalue(tcl_tts_number_entry))
+  
+  # TODO include some other protections to some entries being bigger then others that cause problmes
+  tssbin <- NULL
+  ttsbin <- NULL
+  tsslab <- NULL
+  ttslab <- NULL
+  if(tss_number_entry != 0 & !is.na(tss_start_bin) & !is.na(tss_start_label) & !is.na(tss_num_bp) & !is.na(tss_number_entry) & 
+                                                            !is.na(tss_size_bin)){
+    if(tss_number_entry > 1){
+      tss_number_entry2 <- 2:tss_number_entry
+    } else {
+      tss_number_entry2 <- tss_number_entry
+    }
+    mysteptss <- floor(tss_num_bp/tss_size_bin)
+    tssbin <- c(tss_start_bin, 
+                seq(tss_start_bin,
+                    (mysteptss * tss_number_entry) + tss_start_bin, 
+                    mysteptss)[tss_number_entry2])
+    tsslab <- c(tss_start_label, 
+                seq(tss_start_label,
+                    (tss_num_bp * tss_number_entry) + tss_start_label,
+                    tss_num_bp)[tss_number_entry2])
+  }
+  if(tts_number_entry != 0 & !is.na(tts_start_bin) & !is.na(tts_start_label) & !is.na(tts_num_bp) & !is.na(tts_number_entry) & 
+                                                           !is.na(tts_size_bin)){
+    if(tts_number_entry > 1){
+      tts_number_entry2 <- 2:tts_number_entry
+    }else {
+      tts_number_entry2 <- tts_number_entry
+    }
+    mysteptts <- floor(tts_num_bp/tts_size_bin)
+    ttsbin <- c(tts_start_bin, seq(tts_start_bin,
+                    (mysteptts * tts_number_entry) + tts_start_bin,
+                    mysteptts)[tts_number_entry2])
+    ttslab <- c(tts_start_label, 
+                seq(tts_start_label,
+                    (tts_num_bp * tts_number_entry) +
+                      tts_start_label,
+                    tts_num_bp)[tts_number_entry2])
+  }
+  tt <- c(tssbin, ttsbin)
+  ttt <- c(tsslab, ttslab)
+  tt <- unique(sort(tt))#[ttt != 0]))
+  ttt <- unique(sort(ttt))#[ttt != 0]))
+  if(!is.null(tt)){
+    tkdelete(entry_line_tick_pos_five, 0, "end")
+    tkinsert(entry_line_tick_pos_five, 0, tt)
+  }
+  
+  if(!is.null(ttt)){
+    tkdelete(entry_line_tick_label_five, 0, "end")
+    tkinsert(entry_line_tick_label_five, 0, ttt)
+  }
 }
 
 # clears selection of boxes 
@@ -424,8 +504,8 @@ GeneListPlotHelper <- function(listboxgene){
 }
 
 # helper for making new gene list for tool tab
-ToolListTabHelper <- function(){
-  listname <- tolower(strsplit(tk2notetab.text(notebook_tool),split = "\n")[[1]][1])
+ToolListTabHelper <- function(listname = tolower(strsplit(tk2notetab.text(notebook_tool),split = "\n")[[1]][1])){
+  
   if(listname == "sort"){
     legend_nickname <- paste(listname, "tool")
     listboxname <- listbox_active_gene_sort
@@ -948,13 +1028,15 @@ SetComboBoxes <- function(num_bins){
 
 # global options box
 GlobalOptions <- function(){
+  OptionsFrame <<- tktoplevel()
+  STATE[1] <<- 4
+  tkbind(OptionsFrame, "<Destroy>", function() OnDestroy())
+  
   onOK <- function(){
     tkdestroy(OptionsFrame)
     STATE[1] <<- 0
   }
-  OptionsFrame <<- tktoplevel()
-  STATE[1] <<- 4
-  tkbind(OptionsFrame, "<Destroy>", function() OnDestroy())
+  
   tkgrid(tklabel(OptionsFrame,text="Edit options"), 
          columnspan = 2)
   
@@ -964,7 +1046,6 @@ GlobalOptions <- function(){
   
   tkgrid(tk2button(OptionsFrame, text = "OK", 
                    command = function() onOK()))
-  
   
 }
 
@@ -1352,7 +1433,7 @@ GGplotF <- function(list_long_data_frame, use_col, use_dot, use_line, use_size,
                linetype = virtical_line_data_frame$use_virtical_line_type, 
                color = virtical_line_data_frame$use_virtical_line_color) +
     theme_bw() +
-    theme(panel.grid.minor = element_blank()) +
+    theme(panel.grid.minor = element_blank(), panel.grid.major = element_blank()) +
     theme(axis.title.y = element_text(size =  15)) +
     theme(axis.title.x = element_text(size =  10, vjust = .5)) +
     theme(axis.text.x = element_text( size = 12,  angle = -45, hjust = .1, 
@@ -1662,6 +1743,16 @@ CumulativeDistribution <- function(){
     tkconfigure(gene_list_label, text = paste("File", i, ' n = ', (as.integer(tksize(gene_list)))))
     
   }
+  if(length(df) == 2){
+    tt <- ks.test(df[[1]]$value, df[[2]]$value)
+    if(tt[[2]] == 0){
+      ttt <- "< 2.2e-16"
+    } else {
+      ttt <- tt[[2]]
+    }
+    use_header <- paste(use_header, paste("  p-value = ", format(ttt, scientific = TRUE)))
+    print(tt)
+  }
   df2 <- bind_rows(df)
   GGplotC(df2, unique(my_xlab), use_col, use_header, legend_space)
   
@@ -1887,8 +1978,9 @@ tkadd(menu_top_file, "command", label = "Restart",
       command = function() ClearTableFile())
 tkadd(menu_top, "cascade", label = "File", menu = menu_top_file) 
 menu_top_options <- tkmenu(menu_top, tearoff = FALSE)
-tkadd(menu_top_options, "command", label = "Options",
+tkadd(menu_top_options, "command", label = "Set Options",
       command = function() GlobalOptions())
+
 tkadd(menu_top, "cascade", label = "Extra's", menu = menu_top_options) 
 
 # FILE frame for loading files and main controls ----
@@ -2102,14 +2194,63 @@ entry_line_tick_pos_five <- tk2entry(tab_plot_options_line_tick_frame,
                                      width = kWidth + 2,
                                      textvariable = tcl_pos_plot_ticks)
 tkgrid(entry_line_tick_pos_five, column = 1, row = 12, padx = c(0, 0), 
-       columnspan = 5, sticky = "w")
+       columnspan = 6, sticky = "w")
 tkgrid(tklabel(tab_plot_options_line_tick_frame, text = 'label'), 
        padx = c(5, 0), column = 0, row = 13, sticky = "w")
 entry_line_tick_label_five <- tk2entry(tab_plot_options_line_tick_frame, 
                                     width = kWidth + 2, 
                                     textvariable = tcl_label_plot_ticks)
 tkgrid(entry_line_tick_label_five, column = 1, row = 13, padx = c(0, 0), 
-       columnspan = 5)
+       columnspan = 6, sticky = "w")
+
+tkgrid(tklabel(tab_plot_options_line_tick_frame, text = ' 1st lable,   pos,  every,  size bin,  # entries '),
+       columnspan = 6, row = 14, sticky = "w", pady = c(15,0))
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tss_start_label),  
+       padx = c(10, 0), pady = c(5, 5), column = 0, row = 15)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tss_start_bin),  
+       padx = c(10, 0), pady = c(5, 5), column = 1, row = 15)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tss_num_bp),  
+       padx = c(10, 0), pady = c(5, 5), column = 2, row = 15)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tss_size_bin),  
+       padx = c(10, 0), pady = c(5, 5), column = 3, row = 15)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tss_number_entry),  
+       padx = c(10, 10), pady = c(5, 5), column = 4, row = 15)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tts_start_label),  
+       padx = c(10, 0), pady = c(5, 5), column = 0, row = 16)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tts_start_bin),  
+       padx = c(10, 0), pady = c(5, 5), column = 1, row = 16)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tts_num_bp),  
+       padx = c(10, 0), pady = c(5, 5), column = 2, row = 16)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tts_size_bin),  
+       padx = c(10, 0), pady = c(5, 5), column = 3, row = 16)
+
+tkgrid(tk2entry(tab_plot_options_line_tick_frame, width = 5, 
+                textvariable = tcl_tts_number_entry),  
+       padx = c(10, 10), pady = c(5, 5), column = 4, row = 16)
+
+tkgrid(tk2button(tab_plot_options_line_tick_frame,text = " OK ", command = function() LableMaker()), 
+       column = 5, row = 15, rowspan = 2) 
+
+
+
 tkgrid(tab_plot_options_line_tick_frame, column = 0, row = 0, sticky = 'nsew')
 tkpack.configure(tab_plot_options_line_tick_frame, fill ="both", expand = 1)
 

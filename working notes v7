@@ -2,6 +2,14 @@ Ben tools v7
 
 http://www.sciviews.org/recipes/tcltk/toc/
 
+need to move Global options to a button and off dropdown as it causes probles making and focusing windows
+
+add opition to change vertcal line types? # 1379 use_virtical_line_type <- c(3,3,1,1)  # TODO add change virtical line type
+c("dotted","dotted","solid","solid")
+
+add quantile cutoff signal filter
+
+Add find max within range tool?
 
 ####### version C?########
 add a higher level of notbook and group simular tools together?
@@ -33,3 +41,6 @@ added quantiles to cluster tab
 added in options to split gene out list on ; + - |
 updated numbers on dropdown lists
 Update switching plot lines in Options now updates the bin tabs in the tools
+removed major brakes in plot ie grid lines
+add label helper function to lines and labels tab
+added two sidded ks.test if two files are used in cdf tool
