@@ -454,7 +454,7 @@ ListBoxSelectHelper <- function(listboxgene){
       listboxgene <- get("listbox_intersect_exclusive")
     }
   } else if (listboxgene[1] == "cdf"){
-    my_tab <- strsplit(tk2notetab.text(notebook_cluster), split = " ")[[1]]
+    my_tab <- strsplit(tk2notetab.text(notebook_cdf), split = " ")[[1]]
     listboxgene <- get(paste("listbox_gene_cdf_list" ,my_tab[2] , sep = ""))
   }
   return(listboxgene)
@@ -3158,7 +3158,10 @@ tkgrid(listbox_active_cdf, columnspan = 3)
 
 tkgrid(tk2button(frame_cdf_tab, text = "Activate file(s)", command = function()
   ActLst(listbox_active_cdf, 5)), tk2button(frame_cdf_tab, text = "Clear Tool", command = function()
-    DActLst(listbox_active_cdf, NULL, NULL)))
+    DActLst(listbox_active_cdf, sapply(c(1:4), function(x){
+      paste("listbox_gene_cdf_list" , x, sep = "")}),
+      sapply(c(1:4), function(x){
+        paste("label_cdf_list" , x, sep = "")}))))
 
 frame_cdf_tab_buttons <- tkframe(frame_cdf_tab, relief = 'ridge',
                                     borderwidth = 5) 

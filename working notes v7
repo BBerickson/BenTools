@@ -7,9 +7,12 @@ need to move Global options to a button and off dropdown as it causes probles ma
 add opition to change vertcal line types? # 1379 use_virtical_line_type <- c(3,3,1,1)  # TODO add change virtical line type
 c("dotted","dotted","solid","solid")
 
-add quantile cutoff signal filter
+add quantile cutoff signal filter to sort tool options
 
-Add find max within range tool?
+Add find max within range tool? after combinding range and region tools
+
+need to fix remove file if name in gene list is diffrent then in common gene list
+
 
 ####### version C?########
 add a higher level of notbook and group simular tools together?
