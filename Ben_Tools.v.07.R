@@ -87,6 +87,10 @@ tcl_listq1file <- tclVar("quantile 1")
 tcl_listq2file <- tclVar("quantile 2")
 tcl_listq3file <- tclVar("quantile 3")
 tcl_listq4file <- tclVar("quantile 4")
+tcl_peaks1file <- tclVar("1st Qu max bins")
+tcl_peaks2file <- tclVar("Median max bins")
+tcl_peaks3file <- tclVar("Mean max bins")
+tcl_peaks4file <- tclVar("3ed Qu max bins")
 tcl_toolfile <- tclVar("tool")
 tcl_line_option <- tclVar(kLineOptions[1])
 tcl_dot_option <- tclVar(kDotOptions[1])
@@ -96,7 +100,10 @@ tcl_acc_dec <- tclVar(kAccDec[2])
 tcl_acc_dec_cdf <- tclVar(kAccDec[2])
 tcl_quntile_cdf_bottom <- tclVar(kQuntile[1])
 tcl_quntile_cdf_top <- tclVar(kQuntile[1])
-tcl_bin_fold_region <- tclVar(kFoldList[6])
+tcl_bin_start_width_peaks <- tclVar(1)
+tcl_bin_end_width_peaks <- tclVar(5)
+tcl_bin_center_peaks <- tclVar(0)
+tcl_bin_fold_peaks <- tclVar(kFoldList[6])
 tcl_in_out_option_ratios <- tclVar(kInOutOptions[1])
 tcl_bin_fold_ratios <- tclVar(kFoldList[6])
 tcl_math_option <- tclVar(kMathOptions[1])
@@ -104,8 +111,8 @@ tcl_norm_bin <- tclVar(0)
 tcl_bin_start <- tclVar(1)
 tcl_bin_end <- tclVar(1)
 tcl_brewer <- tclVar(kBrewerList[3])
-tcl_bin_start_region <- tclVar(1)
-tcl_bin_end_region <- tclVar(1)
+tcl_bin_start_peaks <- tclVar(1)
+tcl_bin_end_peaks <- tclVar(1)
 tcl_bin_start1_ratios <- tclVar(0)
 tcl_bin_end1_ratios <- tclVar(0)
 tcl_bin_start2_ratios <- tclVar(0)
@@ -427,15 +434,9 @@ ClusterNumList <- function(cm){
 
 # helper for finding what gene list is active
 ListBoxSelectHelper <- function(listboxgene){
-  if (listboxgene[1] == "region"){
-    my_tab <- tk2notetab.text(notebook_region)
-    if(my_tab == "File 2 up"){
-      listboxgene <- listbox_gene_region_down
-    } else if(my_tab == "Fold inbetween"){
-      listboxgene <- listbox_gene_region_between
-    } else{
-      listboxgene <- listbox_gene_region_up
-    }
+  if (listboxgene[1] == "peaks"){
+    my_tab <- strsplit(tk2notetab.text(notebook_peaks), split = " ")[[1]]
+    listboxgene <- get(paste("listbox_gene_peaks_list" ,my_tab[2] , sep = ""))
   } else if (listboxgene[1] == "ratios"){
     my_tab <- tk2notetab.text(notebook_ratios)
     if(my_tab == "File 2 up"){
@@ -554,12 +555,7 @@ DActAll <- function(){
   DActLst(listbox_active_sort, "listbox_active_gene_sort", 
           "label_active_sort_length")
   
-  DActLst(listbox_active_region, sapply(c("up","down","between"), function(x){
-    paste("listbox_gene_region_" , x, sep = "")}),
-  sapply(c("up","down","between"), function(x){
-    paste("label_region_" , x, sep = "")}))
-  
-  DActLst(listbox_active_ratios, sapply(c("up","down","between"), function(x){
+    DActLst(listbox_active_ratios, sapply(c("up","down","between"), function(x){
     paste("listbox_gene_ratios_" , x, sep = "")}),
     sapply(c("up","down","between"), function(x){
       paste("label_ratios_" , x, sep = "")}))
@@ -577,6 +573,11 @@ DActAll <- function(){
     paste("listbox_gene_cdf_list" , x, sep = "")}),
     sapply(c(1:4), function(x){
       paste("label_cdf_list" , x, sep = "")}))
+  
+  DActLst(listbox_active_peaks, sapply(c(1:4), function(x){
+    paste("listbox_gene_peaks_list" , x, sep = "")}),
+    sapply(c(1:4), function(x){
+      paste("label_peaks_list" , x, sep = "")}))
 }
 
 # adds selected item(s) to active tool list
@@ -815,17 +816,10 @@ SaveGenelist <- function(listboxgene, activelistbox, toolinfo = " "){
     R_order <- tclvalue(tcl_acc_dec)
     toolinfo <- paste0("sort tool: ", R_option, R_num, ": bins ", R_start_bin, " to ", R_end_bin, " ", R_order)
     
-  } else if (toolinfo == "region"){
-    R_start_bin <- as.integer(tclvalue(tcl_bin_start_region))
-    R_end_bin <- as.integer(tclvalue(tcl_bin_end_region))
-    R_num <- as.numeric(tclvalue(tcl_bin_fold_region))
-    my_tab <- strsplit(x = tk2notetab.text(notebook_region), split = " ")[[1]][2]
-    if(my_tab == 1 | my_tab == 2){
-      my_file <- paste(R_num, "fold up in", as.character(tkget(activelistbox, as.numeric(my_tab)-1)))
-    } else {
-      my_file <- paste(my_tab, "fold change", R_num)
-    }
-    toolinfo <- paste("region tool:", my_file, ": bins", R_start_bin, "to", R_end_bin)
+  } else if (toolinfo == "peaks"){
+    R_start1_bin <- as.integer(tclvalue(tcl_bin_start_peaks))
+    R_end1_bin <- as.integer(tclvalue(tcl_bin_end_peaks))
+    toolinfo <- paste0("peak tool: ", ": bins ", R_start1_bin, ":", R_end1_bin)
   } else if(toolinfo == "ratios"){
     R_start1_bin <- as.integer(tclvalue(tcl_bin_start1_ratios))
     R_end1_bin <- as.integer(tclvalue(tcl_bin_end1_ratios))
@@ -838,7 +832,7 @@ SaveGenelist <- function(listboxgene, activelistbox, toolinfo = " "){
     } else {
       my_file <- paste(my_tab, "fold change", R_num)
     }
-    toolinfo <- paste0("region tool: ", my_file, ": bins ", R_start1_bin, ":", R_end1_bin, "/", 
+    toolinfo <- paste0("ratios tool: ", my_file, ": bins ", R_start1_bin, ":", R_end1_bin, "/", 
                        R_start2_bin, ":", R_end2_bin)
   }else if(toolinfo == "cluster"){
     R_start_bin <- as.integer(tclvalue(tcl_bin_start_cluster))
@@ -999,10 +993,13 @@ SetComboBoxes <- function(num_bins){
   tkconfigure(combobox_norm_bin, values = c(0:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_start, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end, values = c(1:(num_bins[2] - 1)))
-  tkconfigure(combobox_bin_start_region, values = c(1:(num_bins[2] - 1)))
-  tkconfigure(combobox_bin_end_region, values = c(1:(num_bins[2] - 1)))
+  tkconfigure(combobox_bin_start_peaks, values = c(1:(num_bins[2] - 1)))
+  tkconfigure(combobox_bin_start_width_peaks, values = c(seq(1,(num_bins[2] - 1),2)))
+  tkconfigure(combobox_bin_end_width_peaks, values = c(seq(1,(num_bins[2] - 1),2)))
+  tkconfigure(combobox_bin_center_peaks, values = c(1:(num_bins[2] - 1)))
+  tkconfigure(combobox_bin_end_peaks, values = c(1:(num_bins[2] - 1)))
   tkset(combobox_bin_end, num_bins[2] - 1)
-  tkset(combobox_bin_end_region, num_bins[2] - 1)
+  tkset(combobox_bin_end_peaks, num_bins[2] - 1)
   tkconfigure(combobox_bin_start1_ratios, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end1_ratios, values = c(1:(num_bins[2] - 1)))
   tkset(combobox_bin_start1_ratios, min(floor(list_plot_lines[[num]][3])/2, num_bins[2] - 1))
@@ -1545,58 +1542,140 @@ SortTop <- function() {
     tkconfigure(label_active_sort_length, text = paste('n = ', (as.integer(tksize(listbox_active_gene_sort)))))
 }	
 
-# a[1]/b[2] make gene list
-CompareRegions <- function() { 
-  if (as.integer(tksize(listbox_active_region)) < 2) {
+# finds 1st median mean and 3ed max bin locations within bin ranges
+# one or multiple files
+SortFindMaxPeaks <- function() { 
+  if (as.integer(tksize(listbox_active_peaks)) < 1 ) {
     return ()
   }
-  R_start_bin <- as.integer(tclvalue(tcl_bin_start_region))
-  R_end_bin <- as.integer(tclvalue(tcl_bin_end_region))
-  R_num <- as.numeric(tclvalue(tcl_bin_fold_region))
+  nick_name <- as.character(tkget(listbox_active_peaks, 0, 'end'))
+  Start_peak_width <- (as.numeric(tclvalue(tcl_bin_start_width_peaks))-1)/2
+  R_start_bin <- as.integer(tclvalue(tcl_bin_start_peaks))
+  R_end_bin <- as.integer(tclvalue(tcl_bin_end_peaks))
+  lc <- 0
+  my_ref <- NULL
+  nick_name2 <-NULL
+  enesg1 <- NULL
+  enesg2 <- NULL
+  enesg3 <- NULL
+  enesg4 <- NULL
+  df <- list()
+  clist <- list()
+  gene_info <- list(list())
+  lapply(nick_name, function(j){
+    nick_name1 <- strsplit(sub('-', '\n!',j), '\n!')[[1]]
+    nick_name2 <<- c(nick_name2, nick_name1[2], nick_name1[2], nick_name1[2], nick_name1[2])
+    my_ref1  <- LIST_DATA$gene_info[[nick_name1[1]]][[nick_name1[2]]][5]
+    my_ref <<- c(my_ref, my_ref1, my_ref1,my_ref1,my_ref1)
+    enesg <- data.frame(gene = LIST_DATA$gene_file[[nick_name1[1]]]$use, stringsAsFactors = F)
+    df[[nick_name1[2]]] <<- inner_join(enesg, LIST_DATA$table_file[[my_ref1]], by = 'gene')
+    ttt <- apply(df[[nick_name1[2]]][,-1][R_start_bin:R_end_bin], 1, function(x) which.max(x))
+    tt <- summary(ttt)
+    print(nick_name1[2])
+    print(tt)
+    enesg1 <<- c(enesg1, df[[nick_name1[2]]][findInterval(ttt, c(floor(tt[[2]]-Start_peak_width),ceiling(tt[[2]]+Start_peak_width)),rightmost.closed = T)==1L,1])
+    enesg2 <<- c(enesg2, df[[nick_name1[2]]][findInterval(ttt, c(floor(tt[[3]]-Start_peak_width),ceiling(tt[[3]]+Start_peak_width)),rightmost.closed = T)==1L,1])
+    enesg3 <<- c(enesg3, df[[nick_name1[2]]][findInterval(ttt, c(floor(tt[[6]]-Start_peak_width),ceiling(tt[[6]]+Start_peak_width)),rightmost.closed = T)==1L,1])
+    enesg4 <<- c(enesg4, df[[nick_name1[2]]][findInterval(ttt, c(floor(tt[[5]]-Start_peak_width),ceiling(tt[[5]]+Start_peak_width)),rightmost.closed = T)==1L,1])
+    if(lc > 0){
+      enesg1 <<- unique(enesg1[duplicated(enesg1)])
+      enesg2 <<- unique(enesg2[duplicated(enesg2)])
+      enesg3 <<- unique(enesg3[duplicated(enesg3)])
+      enesg4 <<- unique(enesg4[duplicated(enesg4)])
+    }
+    lc <<- lc + 1
+  })
+  
+  for(i in 1:4){
+    color_safe <- i %% length(kListColorSet)
+    if (color_safe == 0) {
+      color_safe <- 1
+    }
+    gene_list_label <- get(paste("label_peaks_list", i, sep = ""))
+    gene_list <- get(paste("listbox_gene_peaks_list", i, sep = ""))
+    my_gene_list <- unlist(get(paste("enesg", i, sep = "")))
+    
+    if(length(my_gene_list) > 0){
+      clist[[paste("max", i, sep = "")]]$use <- my_gene_list
+      color_select <- kListColorSet[color_safe]
+      gene_info[[paste("max", i, sep = "")]][[my_ref[i]]] <- c(kDotOptions[1],
+                                                               kLineOptions[1], 
+                                                               color_select, 
+                                                               1,
+                                                               nick_name2[i])
+    }
+    tkdelete(gene_list, 0,"end")
+    tkconfigure(gene_list_label, text = paste(' n = ', (as.integer(tksize(gene_list)))))
+    tkconfigure(gene_list, listvariable = tclVar(my_gene_list))
+    tkconfigure(gene_list_label, text = paste(tclvalue((get(paste0("tcl_peaks",i,"file")))), 
+                                              ' n = ', (as.integer(tksize(gene_list)))))
+  }
+  if(length(nick_name) == 1){
+    MakeDataFrame(sel_list = NULL, table_file = df, gene_file = clist, gene_info = gene_info)
+  }
+}	
+
+# finds peaks within range of width, can be restricted to a position, and start width
+# max_width >= num_bins <= min_width, center +/- start end be part on ccbox control 
+# add max min peak range
+TssMaxPeaks <- function() { 
+  if (as.integer(tksize(listbox_active_peaks)) < 1) {
+    return ()
+  }
+  R_start_bin <- as.integer(tclvalue(tcl_bin_start_peaks))
+  R_end_bin <- as.integer(tclvalue(tcl_bin_end_peaks))
+  center_peak <- as.integer(tclvalue(tcl_bin_center_peaks))
+  num_bins <- as.integer(tclvalue(tcl_bin_start_width_peaks))
+  peak_width_max <- as.integer(tclvalue(tcl_bin_end_width_peaks))
+  peak_hight_fold <- as.integer(tclvalue(tcl_bin_fold_peaks))
+  # for item in active list make sorted list, then merge sort=T, then pull out request
   lc <- 0
   outlist <- NULL
-  nick_name <- as.character(tkget(listbox_active_region, 0, 'end'))
+  nick_name <- as.character(tkget(listbox_active_peaks, 0, 'end'))
   lapply(nick_name, function(j){
     nick_name2 <- strsplit(sub('-', '\n!',j), '\n!')[[1]]
     my_ref  <- LIST_DATA$gene_info[[nick_name2[1]]][[nick_name2[2]]][5]
     enesg <- data.frame(gene = LIST_DATA$gene_file[[nick_name2[1]]]$use, stringsAsFactors = F)
     df <- inner_join(enesg, LIST_DATA$table_file[[my_ref]], by = 'gene')
-    df[is.na(df)] <- 0  # replace NAs with 0
-    # find min value /2 to replace if sum = 0s 
-    new_min <- min(df[, -1][df[ , -1] > 0]) / 2
-    apply_bins <- data.frame(gene = df[ , 1], sum = rowSums(df[ , -1][R_start_bin:R_end_bin],	na.rm = T))
-    lc <<- lc + 1
-    outlist[[lc]] <<- replace(apply_bins, apply_bins == 0, new_min)
-    if(lc > 1){
-      outlist[[1]] <<- merge(outlist[[1]], outlist[[lc]], by = 'gene', sort = FALSE)
-      outlist[[1]][ , 4] <<- outlist[[1]][ , 2] / outlist[[1]][ , 3]
-      ix <- sort(outlist[[1]][ , 4], decreasing = T, index = T)$ix
-      outlist[[1]] <<- outlist[[1]][ix,]
+    ttt <- apply(df[,-1], 1, function(x) which.max(x))
+    if(center_peak > 0){
+      ix <- findInterval(ttt, c(floor(center_peak-num_bins),ceiling(center_peak+num_bins)),rightmost.closed = T)==1L
+      df <- df[ix,]
+      ttt <- ttt[ix]
     }
-  } )
-  tkdelete(listbox_gene_region_up, 0, 'end')
-  if(sum(outlist[[1]][ ,4] > R_num) > 0){
-    tkconfigure(listbox_gene_region_up, listvariable = tclVar(as.character(outlist[[1]][ , 1][outlist[[1]][ ,4] > R_num])))
-  }
-  tkconfigure(label_region_up, text = paste('n = ', (as.integer(tksize(listbox_gene_region_up)))))
-  
-  tkdelete(listbox_gene_region_down, 0, 'end')
-  if(sum(outlist[[1]][ ,4] < 1/R_num) > 0){
-    tkconfigure(listbox_gene_region_down, listvariable = tclVar(as.character(outlist[[1]][ , 1][outlist[[1]][ ,4] < 1/R_num])))
-  }
-  tkconfigure(label_region_down, text = paste('n = ', (as.integer(tksize(listbox_gene_region_down)))))
     
-  tkdelete(listbox_gene_region_between, 0, 'end')
-  if(sum(outlist[[1]][ ,4] <= R_num & outlist[[1]][ ,4] >= 1/R_num) > 0){
-    tkconfigure(listbox_gene_region_between, listvariable = 
-                  tclVar(as.character(outlist[[1]][ , 1][outlist[[1]][ ,4] <= R_num & outlist[[1]][ ,4] >= 1/R_num])))
+    tt <- sapply(seq_along(ttt), function(i){
+      if(R_start_bin <= (ttt[i]-num_bins) & (ttt[i]+num_bins) <= R_end_bin){
+        background <- mean(unlist(df[i,-1][R_start_bin:R_end_bin][findInterval(R_start_bin:R_end_bin, c(ttt[i]-num_bins,ttt[i]+num_bins),rightmost.closed = T)==1L]),	na.rm = T)
+        peak <- mean(unlist(df[i,-1][(ttt[i]-num_bins):(ttt[i]+num_bins)]),	na.rm = T)
+        while(peak*peak_hight_fold > background & (ttt[i]-num_bins) > 0 & (ttt[i]+num_bins) <= ncol(df[,-1])){
+          num_bins <- num_bins + 1
+          peak <- mean(unlist(df[i,ttt[i]-num_bins:ttt[i]+num_bins]),	na.rm = T)
+        }
+      } else{
+        num_bins <- ncol(df[,-1])
+      }
+      num_bins*2
+    })
+    outlist <<- c(outlist, df[tt <= peak_width_max, 1])
+    if(lc > 0){
+      outlist <<- unique(outlist[duplicated(outlist)])
+    }
+    lc <<- lc + 1
+  } )
+  for(i in 1:4){
+    gene_list_label <- get(paste("label_peaks_list", i, sep = ""))
+    gene_list <- get(paste("listbox_gene_peaks_list", i, sep = ""))
+    tkdelete(gene_list, 0,"end")
+    tkconfigure(gene_list_label, text = paste(' n = ', (as.integer(tksize(gene_list)))))
+    
   }
-  tkconfigure(label_region_between, text = paste('n = ', (as.integer(tksize(listbox_gene_region_between)))))
-      
-  # add ploting?
+  tkconfigure(listbox_gene_peaks_list1, listvariable = tclVar(as.character(outlist)))
+  tkconfigure(label_peaks_list1, text = paste(' n = ', as.integer(tksize(listbox_gene_peaks_list1))))
 }	
 
-# (a[1]/a[2])/(b[1]/b[2]) make gene list
+
+# a[1]/b[2] or (a[1]/a[2])/(b[1]/b[2]) make gene list
 CompareRatios <- function(){
     if (as.integer(tksize(listbox_active_ratios)) < 2) {
       return ()
@@ -2531,7 +2610,7 @@ frame_tool <- tkframe(root)
 frame_notebook_tool <- tkframe(frame_tool)
 
 notebook_tool <- tk2notebook(frame_notebook_tool, tabs = c("Sort\nTool",
-                                                           "Region\nTool", 
+                                                           "Peaks\nTool", 
                                                            "Ratios\nTool",
                                                            "Cluster\nTool",
                                                            "Intersect\nTool",
@@ -2638,133 +2717,169 @@ tkgrid(entry_sort_search <- tk2entry(frame_sort_tab, tip = "Enter gene name to s
 tkgrid(frame_sort_tab)
 tkpack.configure(frame_sort_tab, fill = 'both', expand = 1)
 
-# TOOL: tab Region ----
+#TOOL: tab peak tool  ----
+  
+notebook_peaks_tab <- tk2notetab(notebook_tool, "Peaks\nTool")
 
-notebook_region_tab <- tk2notetab(notebook_tool, "Region\nTool")
+frame_peaks_tab <- tkframe(notebook_peaks_tab, 
+                         relief = 'ridge', borderwidth = 5)
 
-frame_region_tab <- tkframe(notebook_region_tab, 
-                            relief = 'ridge', borderwidth = 5)
+label_active_peaks <- tklabel(frame_peaks_tab, text = "No Active table files")
+tkgrid(label_active_peaks, columnspan = 3)
 
-label_active_region <- tklabel(frame_region_tab, text = "No Active table files")
-tkgrid(label_active_region, columnspan = 3)
+listbox_active_peaks <- tk2listbox(frame_peaks_tab, height = 4, width = kWidth + 8, 
+                                 tip = "activate 4 files to use tool",  scroll = 'x',
+                                 autoscroll = 'none')
+tkgrid(listbox_active_peaks, columnspan = 3)
 
-listbox_active_region <- tk2listbox(frame_region_tab, height = 2, width = kWidth + 10, 
-                                   tip = "activate 2 files to use tool",  scroll = 'x', 
-                                   autoscroll = 'none')
-tkgrid(listbox_active_region, columnspan = 3)
+tkgrid(tk2button(frame_peaks_tab, text = "Activate file(s)", command = function()
+  ActLst(listbox_active_peaks, 5)), tk2button(frame_peaks_tab, text = "Clear Tool", command = function()
+    DActLst(listbox_active_peaks, sapply(c(1:4), function(x){
+      paste("listbox_gene_peaks_list" , x, sep = "")}),
+      sapply(c(1:4), function(x){
+        paste("label_peaks_list" , x, sep = "")}))))
 
-tkgrid(tk2button(frame_region_tab, text = "Activate file(s)", command = function()
-  ActLst(listbox_active_region, 3)), tk2button(frame_region_tab, text = "Clear Tool", command = function()
-    DActLst(listbox_active_region, sapply(c("up","down","between"), function(x){
-      paste("listbox_gene_region_" , x, sep = "")}),
-      sapply(c("up","down","between"), function(x){
-        paste("label_region_" , x, sep = "")}))))
+frame_peaks_tab_buttons <- tkframe(frame_peaks_tab, relief = 'ridge',
+                                 borderwidth = 5) 
 
-frame_region_tab_buttons <- tkframe(frame_region_tab, relief = 'ridge',
-                                  borderwidth = 5) 
+tkgrid(tklabel(frame_peaks_tab_buttons, text = "peaks tools"), columnspan = 4, padx = c(50, 0)) 
 
-tkgrid(tklabel(frame_region_tab_buttons, text = "region tools"), columnspan = 4, padx = c(50, 0)) 
+tkgrid(tklabel(frame_peaks_tab_buttons, text = "bins"),
+       padx = c(10, 0), column = 0, row = 2, sticky ="e")
 
-tkgrid(tklabel(frame_region_tab_buttons,
-                   text = "fold change"), sticky = "w", 
-       columnspan = 2, column = 0, row = 1, padx = c(50, 0)) 
+combobox_bin_start_peaks <- tk2combobox(frame_peaks_tab_buttons, 
+                                       textvariable = tcl_bin_start_peaks,
+                                       state = "readonly", width = 3) 
+tkgrid(combobox_bin_start_peaks, padx = c(0, 0), column = 1, row = 2, sticky ="w")
+tkbind(combobox_bin_start_peaks, "<<ComboboxSelected>>", function()
+  BinStartEndHelper(tcl_bin_start_peaks, tcl_bin_end_peaks, combobox_bin_start_peaks, combobox_bin_end_peaks, 1))
 
-tkgrid(tk2combobox(frame_region_tab_buttons,
-                   values =  kFoldList, 
-                   textvariable = tcl_bin_fold_region, 
-                   state = "readonly", width = 3), sticky = "we", 
-       columnspan = 2, column = 2, row = 1, padx = c(0, 5), pady = c(10, 10))
+tkgrid(tklabel(frame_peaks_tab_buttons, text = "to"),
+       column = 2, row = 2, padx = c(0, 0), sticky ="w")
+combobox_bin_end_peaks <- tk2combobox(frame_peaks_tab_buttons, 
+                                     textvariable = tcl_bin_end_peaks,
+                                     state = "readonly", width = 3) 
+tkgrid(combobox_bin_end_peaks, column = 3, row = 2, padx = c(0, 0), sticky ="w")
+tkbind(combobox_bin_end_peaks, "<<ComboboxSelected>>", function()
+  BinStartEndHelper(tcl_bin_start_peaks, tcl_bin_end_peaks, combobox_bin_start_peaks, combobox_bin_end_peaks, 2))
 
-tkgrid(tklabel(frame_region_tab_buttons, text = "bins"),
-       padx = c(50, 0), column = 0, row = 3, sticky ="e")
+tkgrid(tklabel(frame_peaks_tab_buttons, text = "min"),
+       column = 0, row = 3, padx = c(0, 0), sticky ="w")
+combobox_bin_start_width_peaks <- tk2combobox(frame_peaks_tab_buttons, 
+                                      textvariable = tcl_bin_start_width_peaks,
+                                      state = "readonly", width = 3) 
+tkgrid(combobox_bin_start_width_peaks, column = 1, row = 3, padx = c(0, 0), sticky ="w")
 
-combobox_bin_start_region <- tk2combobox(frame_region_tab_buttons, 
-                                  textvariable = tcl_bin_start_region,
-                                  state = "readonly", width = 3) 
-tkgrid(combobox_bin_start_region, padx = c(0, 0), column = 1, row = 3, sticky ="w")
-tkbind(combobox_bin_start_region, "<<ComboboxSelected>>", function()
-  BinStartEndHelper(tcl_bin_start_region, tcl_bin_end_region, combobox_bin_start_region, combobox_bin_end_region, 1))
-
-tkgrid(tklabel(frame_region_tab_buttons, text = "to"),
+tkgrid(tklabel(frame_peaks_tab_buttons, text = "max"),
        column = 2, row = 3, padx = c(0, 0), sticky ="w")
-combobox_bin_end_region <- tk2combobox(frame_region_tab_buttons, 
-                                textvariable = tcl_bin_end_region,
-                                state = "readonly", width = 3) 
-tkgrid(combobox_bin_end_region, column = 3, row = 3, padx = c(0, 10), sticky ="w")
-tkbind(combobox_bin_end_region, "<<ComboboxSelected>>", function()
-  BinStartEndHelper(tcl_bin_start_region, tcl_bin_end_region, combobox_bin_start_region, combobox_bin_end_region, 2))
+combobox_bin_end_width_peaks <- tk2combobox(frame_peaks_tab_buttons, 
+                                              textvariable = tcl_bin_end_width_peaks,
+                                              state = "readonly", width = 3) 
+tkgrid(combobox_bin_end_width_peaks, column = 3, row = 3, padx = c(0, 0), sticky ="w")
+
+tkgrid(tklabel(frame_peaks_tab_buttons, text = "center"),
+       column = 0, row = 4, padx = c(0, 0), sticky ="w")
+combobox_bin_center_peaks <- tk2combobox(frame_peaks_tab_buttons, 
+                                              textvariable = tcl_bin_center_peaks,
+                                              state = "readonly", width = 3) 
+tkgrid(combobox_bin_center_peaks, column = 1, row = 4, padx = c(0, 0), sticky ="w")
+
+tkgrid(tklabel(frame_peaks_tab_buttons, text = "diff"),
+       column = 2, row = 4, padx = c(0, 0), sticky ="w")
+combobox_bin_fold_peaks <- tk2combobox(frame_peaks_tab_buttons, 
+                                            textvariable = tcl_bin_fold_peaks,
+                                            state = "readonly", width = 3) 
+tkgrid(combobox_bin_fold_peaks, column = 3, row = 4, padx = c(0, 0), sticky ="w")
+
+tkgrid(tk2button(frame_peaks_tab_buttons, text = " Quntile peaks ", 
+                 command =  function() SortFindMaxPeaks()), 
+       column = 0, row = 5, columnspan = 2, pady = c(5, 5), padx = c(10, 0))
+
+tkgrid(tk2button(frame_peaks_tab_buttons, text = " find peaks ", 
+                 command =  function() TssMaxPeaks()), 
+       column = 2, row = 5, columnspan = 2, pady = c(5, 5), padx = c(10, 0))
 
 
-tkgrid(tk2button(frame_region_tab_buttons, text = "   region   ", 
-                command =  function() CompareRegions()), 
-       column = 0, row = 4, columnspan = 4, pady = c(10, 10), padx = c(50, 0))
+tkgrid(frame_peaks_tab_buttons, columnspan = 4, sticky = 'nsew')
 
-tkgrid(frame_region_tab_buttons, columnspan = 4, sticky = 'nsew')
+notebook_peaks <- tk2notebook(frame_peaks_tab, 
+                            tabs = c("list 1", "list 2",
+                                     "list 3", "list 4"))
+tkgrid(notebook_peaks, columnspan = 4)
 
-notebook_region <- tk2notebook(frame_region_tab, 
-                             tabs = c("File 1 up", "File 2 up",
-                                      "Fold inbetween"))
-tkgrid(notebook_region, columnspan = 4)
+notebook_peaks_list1_tab <- tk2notetab(notebook_peaks, "list 1")
 
-notebook_region_up_tab <- tk2notetab(notebook_region, "File 1 up")
 
-frame_region_notbook_up <- tkframe(notebook_region_up_tab)
+frame_peaks_notbook_list1 <- tkframe(notebook_peaks_list1_tab)
 
-tkgrid(label_region_up <- tklabel(frame_region_notbook_up, text = "n = "), 
+tkgrid(label_peaks_list1 <- tklabel(frame_peaks_notbook_list1, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_region_up <- tk2listbox(frame_region_notbook_up, height = kHeight + 9, width = kWidth + 8,
-                                           selectmode = "extended", autoscroll = 'none'),
+tkgrid(listbox_gene_peaks_list1 <- tk2listbox(frame_peaks_notbook_list1, height = kHeight + 7, width = kWidth + 8,
+                                            selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
-tkgrid(frame_region_notbook_up)
+tkgrid(frame_peaks_notbook_list1)
 
-notebook_region_down_tab <- tk2notetab(notebook_region, "File 2 up")
+notebook_peaks_list2_tab <- tk2notetab(notebook_peaks, "list 2")
 
 
-frame_region_notbook_down <- tkframe(notebook_region_down_tab)
+frame_peaks_notbook_list2 <- tkframe(notebook_peaks_list2_tab)
 
-tkgrid(label_region_down <- tklabel(frame_region_notbook_down, text = "n = "), 
+tkgrid(label_peaks_list2 <- tklabel(frame_peaks_notbook_list2, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_region_down <- tk2listbox(frame_region_notbook_down, height = kHeight + 9, width = kWidth + 8,
-                                           selectmode = "extended", autoscroll = 'none'),
+tkgrid(listbox_gene_peaks_list2 <- tk2listbox(frame_peaks_notbook_list2, height = kHeight + 7, width = kWidth + 8,
+                                            selectmode = "extended", autoscroll = 'none'),
        columnspan = 3, pady = c(5,5))
-tkgrid(frame_region_notbook_down)
+tkgrid(frame_peaks_notbook_list2)
 
-notebook_region_between_tab <- tk2notetab(notebook_region, "Fold inbetween")
+notebook_peaks_list3_tab <- tk2notetab(notebook_peaks, "list 3")
 
-frame_region_notbook_between <- tkframe(notebook_region_between_tab)
+frame_peaks_notbook_list3 <- tkframe(notebook_peaks_list3_tab)
 
-tkgrid(label_region_between <- tklabel(frame_region_notbook_between, text = "n = "), 
+tkgrid(label_peaks_list3 <- tklabel(frame_peaks_notbook_list3, text = "n = "), 
        columnspan = 3)
 
-tkgrid(listbox_gene_region_between <- tk2listbox(frame_region_notbook_between, height = kHeight + 9 , width = kWidth + 8, 
-                                       selectmode = "extended", autoscroll = 'none'), 
+tkgrid(listbox_gene_peaks_list3 <- tk2listbox(frame_peaks_notbook_list3, height = kHeight + 7, width = kWidth + 8, 
+                                            selectmode = "extended", autoscroll = 'none'), 
        columnspan = 3, pady = c(5,5))
-tkgrid(frame_region_notbook_between)
+tkgrid(frame_peaks_notbook_list3)
 
-tkgrid(tk2button(frame_region_tab, text = "plot list", command = function()
-  GeneListPlotHelper("region"), width = 15), column = 0, row = 7, pady = c(5,5))
+notebook_peaks_list4_tab <- tk2notetab(notebook_peaks, "list 4")
 
-tkgrid(tk2button(frame_region_tab, text = "plot selected", command = function()
-  SelectGeneListPlotHelper("region"), width = 15), column = 1, row = 7, pady = c(5,5))
+frame_peaks_notbook_list4 <- tkframe(notebook_peaks_list4_tab)
 
-tkgrid(tk2button(frame_region_tab, text = "Intersect list", command = function()
-  IntersectGeneLists(as.character(tkget(ListBoxSelectHelper("region"), 0, 'end')),
-                     paste("region-", tk2notetab.text(notebook_region))),
-  width = 15), column = 0, row = 8, pady = c(5,5))
+tkgrid(label_peaks_list4 <- tklabel(frame_peaks_notbook_list4, text = "n = "), 
+       columnspan = 3)
 
-tkgrid(tk2button(frame_region_tab, text = "Save list", command = function()
-  SaveGenelist("region", listbox_active_region, "region"), width = 15), column = 1, row = 8, pady = c(5,5))
+tkgrid(listbox_gene_peaks_list4 <- tk2listbox(frame_peaks_notbook_list4, height = kHeight + 7, width = kWidth + 8, 
+                                            selectmode = "extended", autoscroll = 'none'), 
+       columnspan = 3, pady = c(5,5))
+tkgrid(frame_peaks_notbook_list4)
 
-tkgrid(tk2button(frame_region_tab, text = "Search list", command = function()
-  FindGene(entry_region_search, "region"), width = 15), column = 0, row = 9, pady = c(10,10))
+tkgrid(tk2button(frame_peaks_tab, text = "plot list", command = function()
+  GeneListPlotHelper("peaks"), width = 15), column = 0, row = 7, pady = c(5,5))
 
-tkgrid(entry_region_search <- tk2entry(frame_region_tab, tip = "Enter gene name to search", width = 20), 
+tkgrid(tk2button(frame_peaks_tab, text = "plot selected", command = function()
+  SelectGeneListPlotHelper("peaks"), width = 15), column = 1, row = 7, pady = c(5,5))
+
+tkgrid(tk2button(frame_peaks_tab, text = "Intersect list", command = function()
+  IntersectGeneLists(as.character(tkget(ListBoxSelectHelper("peaks"), 0, 'end')),
+                     paste("peaks-", tk2notetab.text(notebook_peaks)))
+  , width = 15), column = 0, row = 8, pady = c(5,5))
+
+tkgrid(tk2button(frame_peaks_tab, text = "Save list", command = function()
+  SaveGenelist('peaks', listbox_active_peaks, "peaks"), width = 15), column = 1, row = 8, pady = c(5,5))
+
+tkgrid(tk2button(frame_peaks_tab, text = "Search list", command = function()
+  FindGene(entry_peaks_search, 'peaks'), width = 15), column = 0, row = 9, pady = c(10,10))
+
+tkgrid(entry_peaks_search <- tk2entry(frame_peaks_tab, tip = "Enter gene name to search", width = 20), 
        column = 1, row = 9, pady = c(10,10))
 
-tkgrid(frame_region_tab)
-tkpack.configure(frame_region_tab, fill = 'both', expand = 1)
+tkgrid(frame_peaks_tab)
+tkpack.configure(frame_peaks_tab, fill = 'both', expand = 1)
+
 
 # TOOL: tab Ratios ----
 
@@ -3310,7 +3425,7 @@ tkgrid(tk2button(frame_cdf_tab, text = "plot selected", command = function()
 
 tkgrid(tk2button(frame_cdf_tab, text = "Intersect list", command = function()
   IntersectGeneLists(as.character(tkget(ListBoxSelectHelper("cdf"), 0, 'end')),
-                     paste("cdf-", tk2notetab.text(notebook_cluster)))
+                     paste("cdf-", tk2notetab.text(notebook_cdf)))
   , width = 15), column = 0, row = 8, pady = c(5,5))
 
 tkgrid(tk2button(frame_cdf_tab, text = "Save list", command = function()
