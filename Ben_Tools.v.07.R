@@ -106,10 +106,10 @@ tcl_bin_end <- tclVar(1)
 tcl_brewer <- tclVar(kBrewerList[3])
 tcl_bin_start_region <- tclVar(1)
 tcl_bin_end_region <- tclVar(1)
-tcl_bin_start1_ratios <- tclVar(1)
-tcl_bin_end1_ratios <- tclVar(1)
-tcl_bin_start2_ratios <- tclVar(1)
-tcl_bin_end2_ratios <- tclVar(1)
+tcl_bin_start1_ratios <- tclVar(0)
+tcl_bin_end1_ratios <- tclVar(0)
+tcl_bin_start2_ratios <- tclVar(0)
+tcl_bin_end2_ratios <- tclVar(0)
 tcl_bin_start1_cdf <- tclVar(1)
 tcl_bin_end1_cdf <- tclVar(1)
 tcl_bin_start2_cdf <- tclVar(1)
@@ -322,6 +322,8 @@ BinStartEndHelper <- function(startbin, endbin, combostart, comboend, num) {
     tkset(comboend, start)
   } else if (num == 2 && start > end) {
     tkset(combostart, end)
+  } else if (start == 0) {
+    tkset(comboend, start)
   }
 }
 
@@ -1005,8 +1007,8 @@ SetComboBoxes <- function(num_bins){
   tkconfigure(combobox_bin_end1_ratios, values = c(1:(num_bins[2] - 1)))
   tkset(combobox_bin_start1_ratios, min(floor(list_plot_lines[[num]][3])/2, num_bins[2] - 1))
   tkset(combobox_bin_end1_ratios, min(floor(list_plot_lines[[num]][3]), num_bins[2] - 1))
-  tkconfigure(combobox_bin_start2_ratios, values = c(1:(num_bins[2] - 1)))
-  tkconfigure(combobox_bin_end2_ratios, values = c(1:(num_bins[2] - 1)))
+  tkconfigure(combobox_bin_start2_ratios, values = c(0:(num_bins[2] - 1)))
+  tkconfigure(combobox_bin_end2_ratios, values = c(0:(num_bins[2] - 1)))
   tkset(combobox_bin_start2_ratios, min(floor(list_plot_lines[[num]][3]) + 1, num_bins[2] - 1))
   tkset(combobox_bin_end2_ratios, min(floor(list_plot_lines[[num]][4]), num_bins[2] - 1))
   tkconfigure(combobox_bin_start1_cdf, values = c(1:(num_bins[2] - 1)))
@@ -1621,7 +1623,12 @@ CompareRatios <- function(){
                                  sum2 = rowSums(df[ , -1][R_start2_bin:R_end2_bin],	na.rm = T), stringsAsFactors = FALSE)
       apply_bins1 <- replace(apply_bins, apply_bins == 0, new_min)
       lc <<- lc + 1
-      outlist[[lc]] <<- data.frame(gene = apply_bins1[ , 1], sum = apply_bins1$sum1 / apply_bins1$sum2, stringsAsFactors = FALSE)
+      if(R_start2_bin == 0 | R_end2_bin == 0){
+        outlist[[lc]] <<- data.frame(gene = apply_bins1[ , 1], sum = apply_bins1$sum1, stringsAsFactors = FALSE)
+      } else {
+        outlist[[lc]] <<- data.frame(gene = apply_bins1[ , 1], sum = apply_bins1$sum1 / apply_bins1$sum2, stringsAsFactors = FALSE)
+      }
+      
       if(lc > 1){
         outlist[[1]] <<- inner_join(outlist[[1]], outlist[[lc]], by = 'gene')
         outlist[[1]][ , 4] <<- outlist[[1]][ , 2] / outlist[[1]][ , 3]
@@ -2832,7 +2839,7 @@ tkgrid(tklabel(frame_ratios_tab_buttons, text = "to"),
        column = 2, row = 4, padx = c(0, 0), sticky ="w")
 combobox_bin_end2_ratios <- tk2combobox(frame_ratios_tab_buttons, 
                                        textvariable = tcl_bin_end2_ratios,
-                                       state = "readonly", width = 3) 
+                                       state = "readonly", width = 3, tip = "can't be less then start, won't change if start is 0") 
 tkgrid(combobox_bin_end2_ratios, column = 3, row = 4, padx = c(0, 0), sticky ="w")
 tkbind(combobox_bin_end2_ratios, "<<ComboboxSelected>>", function()
   BinStartEndHelper(tcl_bin_start2_ratios, tcl_bin_end2_ratios, combobox_bin_start2_ratios, combobox_bin_end2_ratios, 2))
