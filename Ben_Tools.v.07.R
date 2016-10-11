@@ -101,9 +101,8 @@ tcl_acc_dec_cdf <- tclVar(kAccDec[2])
 tcl_quntile_cdf_bottom <- tclVar(kQuntile[1])
 tcl_quntile_cdf_top <- tclVar(kQuntile[1])
 tcl_bin_start_width_peaks <- tclVar(1)
+tcl_bin_center_width_range <- tclVar(3)
 tcl_bin_end_width_peaks <- tclVar(5)
-tcl_bin_center_peaks <- tclVar(0)
-tcl_bin_fold_peaks <- tclVar(kFoldList[6])
 tcl_in_out_option_ratios <- tclVar(kInOutOptions[1])
 tcl_bin_fold_ratios <- tclVar(kFoldList[6])
 tcl_math_option <- tclVar(kMathOptions[1])
@@ -994,9 +993,7 @@ SetComboBoxes <- function(num_bins){
   tkconfigure(combobox_bin_start, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_end, values = c(1:(num_bins[2] - 1)))
   tkconfigure(combobox_bin_start_peaks, values = c(1:(num_bins[2] - 1)))
-  tkconfigure(combobox_bin_start_width_peaks, values = c(seq(1,(num_bins[2] - 1),2)))
-  tkconfigure(combobox_bin_end_width_peaks, values = c(seq(1,(num_bins[2] - 1),2)))
-  tkconfigure(combobox_bin_center_peaks, values = c(1:(num_bins[2] - 1)))
+  tkconfigure(combobox_bin_width_peaks, values = c(seq(1,(num_bins[2] - 1),2)))
   tkconfigure(combobox_bin_end_peaks, values = c(1:(num_bins[2] - 1)))
   tkset(combobox_bin_end, num_bins[2] - 1)
   tkset(combobox_bin_end_peaks, num_bins[2] - 1)
@@ -1596,9 +1593,9 @@ SortFindMaxPeaks <- function() {
     my_gene_list <- unlist(get(paste("enesg", i, sep = "")))
     
     if(length(my_gene_list) > 0){
-      clist[[paste("max", i, sep = "")]]$use <- my_gene_list
+      clist[[paste("peaks", i, sep = "")]]$use <- my_gene_list
       color_select <- kListColorSet[color_safe]
-      gene_info[[paste("max", i, sep = "")]][[my_ref[i]]] <- c(kDotOptions[1],
+      gene_info[[paste("peaks", i, sep = "")]][[my_ref[i]]] <- c(kDotOptions[1],
                                                                kLineOptions[1], 
                                                                color_select, 
                                                                1,
@@ -1616,48 +1613,27 @@ SortFindMaxPeaks <- function() {
 }	
 
 # finds peaks within range of width, can be restricted to a position, and start width
-# max_width >= num_bins <= min_width, center +/- start end be part on ccbox control 
-# add max min peak range
 TssMaxPeaks <- function() { 
   if (as.integer(tksize(listbox_active_peaks)) < 1) {
     return ()
   }
-  R_start_bin <- as.integer(tclvalue(tcl_bin_start_peaks))
-  R_end_bin <- as.integer(tclvalue(tcl_bin_end_peaks))
-  center_peak <- as.integer(tclvalue(tcl_bin_center_peaks))
-  num_bins <- as.integer(tclvalue(tcl_bin_start_width_peaks))
-  peak_width_max <- as.integer(tclvalue(tcl_bin_end_width_peaks))
-  peak_hight_fold <- as.integer(tclvalue(tcl_bin_fold_peaks))
-  # for item in active list make sorted list, then merge sort=T, then pull out request
+  R_start_bin <- as.numeric(tclvalue(tcl_bin_start_peaks))
+  R_start_bin <- as.numeric(tclvalue(tcl_bin_end_peaks))
+  pb <<- tkProgressBar(title = "Finding peaks, please be patient!!",
+                       width = 300)
+  
   lc <- 0
   outlist <- NULL
   nick_name <- as.character(tkget(listbox_active_peaks, 0, 'end'))
   lapply(nick_name, function(j){
     nick_name2 <- strsplit(sub('-', '\n!',j), '\n!')[[1]]
+    setTkProgressBar(pb, 0, label =  paste("Finding peaks in", nick_name2[1], "please be patient!!"))
     my_ref  <- LIST_DATA$gene_info[[nick_name2[1]]][[nick_name2[2]]][5]
     enesg <- data.frame(gene = LIST_DATA$gene_file[[nick_name2[1]]]$use, stringsAsFactors = F)
     df <- inner_join(enesg, LIST_DATA$table_file[[my_ref]], by = 'gene')
     ttt <- apply(df[,-1], 1, function(x) which.max(x))
-    if(center_peak > 0){
-      ix <- findInterval(ttt, c(floor(center_peak-num_bins),ceiling(center_peak+num_bins)),rightmost.closed = T)==1L
-      df <- df[ix,]
-      ttt <- ttt[ix]
-    }
+    outlist <<- c(outlist, df[findInterval(ttt, c((R_start_bin),(R_start_bin)),rightmost.closed = T) == 1L, 1])
     
-    tt <- sapply(seq_along(ttt), function(i){
-      if(R_start_bin <= (ttt[i]-num_bins) & (ttt[i]+num_bins) <= R_end_bin){
-        background <- mean(unlist(df[i,-1][R_start_bin:R_end_bin][findInterval(R_start_bin:R_end_bin, c(ttt[i]-num_bins,ttt[i]+num_bins),rightmost.closed = T)==1L]),	na.rm = T)
-        peak <- mean(unlist(df[i,-1][(ttt[i]-num_bins):(ttt[i]+num_bins)]),	na.rm = T)
-        while(peak*peak_hight_fold > background & (ttt[i]-num_bins) > 0 & (ttt[i]+num_bins) <= ncol(df[,-1])){
-          num_bins <- num_bins + 1
-          peak <- mean(unlist(df[i,ttt[i]-num_bins:ttt[i]+num_bins]),	na.rm = T)
-        }
-      } else{
-        num_bins <- ncol(df[,-1])
-      }
-      num_bins*2
-    })
-    outlist <<- c(outlist, df[tt <= peak_width_max, 1])
     if(lc > 0){
       outlist <<- unique(outlist[duplicated(outlist)])
     }
@@ -1670,8 +1646,17 @@ TssMaxPeaks <- function() {
     tkconfigure(gene_list_label, text = paste(' n = ', (as.integer(tksize(gene_list)))))
     
   }
-  tkconfigure(listbox_gene_peaks_list1, listvariable = tclVar(as.character(outlist)))
-  tkconfigure(label_peaks_list1, text = paste(' n = ', as.integer(tksize(listbox_gene_peaks_list1))))
+  if(length(outlist) == 0){
+    print("empty list")
+    return()
+    close(pb)
+  }
+  ii <- as.integer(strsplit(tk2notetab.text(notebook_peaks), " ")[[1]][2])
+  gene_list_label <- get(paste("label_peaks_list", ii, sep = ""))
+  gene_list <- get(paste("listbox_gene_peaks_list", ii, sep = ""))
+  tkconfigure(gene_list, listvariable = tclVar(as.character(outlist)))
+  tkconfigure(gene_list_label, text = paste(' n = ', as.integer(tksize(gene_list))))
+  close(pb)
 }	
 
 
@@ -2763,41 +2748,24 @@ tkgrid(combobox_bin_end_peaks, column = 3, row = 2, padx = c(0, 0), sticky ="w")
 tkbind(combobox_bin_end_peaks, "<<ComboboxSelected>>", function()
   BinStartEndHelper(tcl_bin_start_peaks, tcl_bin_end_peaks, combobox_bin_start_peaks, combobox_bin_end_peaks, 2))
 
-tkgrid(tklabel(frame_peaks_tab_buttons, text = "min"),
-       column = 0, row = 3, padx = c(0, 0), sticky ="w")
-combobox_bin_start_width_peaks <- tk2combobox(frame_peaks_tab_buttons, 
-                                      textvariable = tcl_bin_start_width_peaks,
-                                      state = "readonly", width = 3) 
-tkgrid(combobox_bin_start_width_peaks, column = 1, row = 3, padx = c(0, 0), sticky ="w")
+tkgrid(tk2button(frame_peaks_tab_buttons, text = " find peaks ", 
+                 command =  function() TssMaxPeaks()), 
+       column = 1, row = 3, columnspan = 3, pady = c(5, 5), padx = c(10, 0))
 
-tkgrid(tklabel(frame_peaks_tab_buttons, text = "max"),
-       column = 2, row = 3, padx = c(0, 0), sticky ="w")
-combobox_bin_end_width_peaks <- tk2combobox(frame_peaks_tab_buttons, 
-                                              textvariable = tcl_bin_end_width_peaks,
-                                              state = "readonly", width = 3) 
-tkgrid(combobox_bin_end_width_peaks, column = 3, row = 3, padx = c(0, 0), sticky ="w")
 
-tkgrid(tklabel(frame_peaks_tab_buttons, text = "center"),
-       column = 0, row = 4, padx = c(0, 0), sticky ="w")
-combobox_bin_center_peaks <- tk2combobox(frame_peaks_tab_buttons, 
-                                              textvariable = tcl_bin_center_peaks,
-                                              state = "readonly", width = 3) 
-tkgrid(combobox_bin_center_peaks, column = 1, row = 4, padx = c(0, 0), sticky ="w")
-
-tkgrid(tklabel(frame_peaks_tab_buttons, text = "diff"),
+tkgrid(tklabel(frame_peaks_tab_buttons, text = "width"),
        column = 2, row = 4, padx = c(0, 0), sticky ="w")
-combobox_bin_fold_peaks <- tk2combobox(frame_peaks_tab_buttons, 
-                                            textvariable = tcl_bin_fold_peaks,
-                                            state = "readonly", width = 3) 
-tkgrid(combobox_bin_fold_peaks, column = 3, row = 4, padx = c(0, 0), sticky ="w")
+combobox_bin_width_peaks <- tk2combobox(frame_peaks_tab_buttons,
+                                       textvariable = tcl_bin_center_width_range,
+                                       state = "readonly", width = 3) 
+tkgrid(combobox_bin_width_peaks, column = 3, row = 4, padx = c(0, 0), sticky ="w")
+
 
 tkgrid(tk2button(frame_peaks_tab_buttons, text = " Quntile peaks ", 
                  command =  function() SortFindMaxPeaks()), 
-       column = 0, row = 5, columnspan = 2, pady = c(5, 5), padx = c(10, 0))
+       column = 0, row = 4, columnspan = 2, pady = c(5, 5), padx = c(10, 0))
 
-tkgrid(tk2button(frame_peaks_tab_buttons, text = " find peaks ", 
-                 command =  function() TssMaxPeaks()), 
-       column = 2, row = 5, columnspan = 2, pady = c(5, 5), padx = c(10, 0))
+
 
 
 tkgrid(frame_peaks_tab_buttons, columnspan = 4, sticky = 'nsew')
