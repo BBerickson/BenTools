@@ -68,6 +68,8 @@ kAccDec <- c("Accend", "Deccend")
 kQuntile <- c("0%", "1%", paste0(seq(5, 45, 5), "%"))
 kFoldList <-
   round(c(1, seq(1.1, 2, by = 0.2), 2, seq(2.1, 4, by = 0.2), 4), digits = 4)
+kLineType <- c("dotted", "solid")
+
 # plot lines and ticks with labels
 list_plot_lines <-
   list(
@@ -182,6 +184,8 @@ tcl_checkbox_split <-
   tclVar(0) # change the output of saved gene lists
 tcl_checkbox_cdf_innerjoin <-
   tclVar(1) # merge the output lists or not
+tcl_tss_tts_line_type <- tclVar(kLineType[1])
+tcl_body_line_type <- tclVar(kLineType[2])
 
 # file list varibles  ----
 
@@ -213,8 +217,8 @@ OpenWindowControl <- function() {
     tkraise(root)
   } else if (STATE[1] == 4) {
     STATE[1] <<- 0
-    print("close OptionsFrame")
-    #tkdestroy(OptionsFrame)
+    #print("close OptionsFrame")
+    tkdestroy(OptionsFrame)
     tkraise(root)
   }
   if (STATE[1] == 2) {
@@ -1200,7 +1204,11 @@ RemoveFile <- function() {
       LIST_DATA$table_file[[nickname]] <<- NULL
       sapply(names(LIST_DATA$gene_info),
              function(k)
-               LIST_DATA$gene_info[[k]][[filename]] <<- NULL)
+               sapply(names(LIST_DATA$gene_info[[k]]), function(ref)
+                 if (LIST_DATA$gene_info[[k]][[ref]][5] == nickname) {
+                   LIST_DATA$gene_info[[k]][[ref]] <<- NULL
+                 }
+                 ))
       kListColorSet <<-
         c(kListColorSet[seq_along(kListColorSet) != i + 1],
           kListColorSet[seq_along(kListColorSet) == i + 1])
@@ -1211,7 +1219,11 @@ RemoveFile <- function() {
       LIST_DATA$table_file[[nickname]] <<- NULL
       sapply(names(LIST_DATA$gene_info),
              function(k)
-               LIST_DATA$gene_info[[k]][[filename]] <<- NULL)
+               sapply(names(LIST_DATA$gene_info[[k]]), function(ref)
+                 if (LIST_DATA$gene_info[[k]][[ref]][5] == nickname) {
+                   LIST_DATA$gene_info[[k]][[ref]] <<- NULL
+                 }
+               ))
       kListColorSet <<-
         c(kListColorSet[seq_along(kListColorSet) != i + 1],
           kListColorSet[seq_along(kListColorSet) == i + 1])
@@ -1314,14 +1326,48 @@ GlobalOptions <- function() {
   }
   
   tkgrid(tklabel(OptionsFrame, text = "Edit options"),
-         columnspan = 2)
+         columnspan = 4)
   
   tkgrid(
-    tkcheckbutton(OptionsFrame, variable = tcl_checkbox_comment, text = "Don't Show save comment box?")
+    tkcheckbutton(OptionsFrame, variable = tcl_checkbox_comment, text = "Don't Show save comment box?"),
+    columnspan = 4)
+  
+  tkgrid(
+    tkcheckbutton(OptionsFrame, variable = tcl_checkbox_split, text = "Split saved gene list?"),
+    columnspan = 4)
+  
+  tkgrid(tklabel(OptionsFrame, text = "TSS TTS line type"),
+         column = 0, row = 6, pady = c(15, 5))
+  
+  combobox_tss_tts_lines <- tk2combobox(
+    OptionsFrame,
+    value = kLineType,
+    textvariable = tcl_tss_tts_line_type,
+    state = "readonly",
+    width = 10
+  )
+  tkgrid(
+    combobox_tss_tts_lines,
+    column = 1,
+    row = 6,
+    padx = c(0, 16), pady = c(15, 5)
   )
   
+  tkgrid(tklabel(OptionsFrame, text = "transition line type"),
+         column = 0, row = 7, pady = c(5, 15))
+  
+  combobox_body_lines <- tk2combobox(
+    OptionsFrame,
+    value = kLineType,
+    textvariable = tcl_body_line_type,
+    state = "readonly",
+    width = 10
+  )
   tkgrid(
-    tkcheckbutton(OptionsFrame, variable = tcl_checkbox_split, text = "Split saved gene list?")
+    combobox_body_lines,
+    column = 1,
+    row = 7,
+    padx = c(0, 16), pady = c(5, 15)
   )
   
   tkgrid(tk2button(
@@ -1329,7 +1375,8 @@ GlobalOptions <- function() {
     text = "OK",
     command = function()
       onOK()
-  ))
+  ),
+  columnspan = 6)
   
 }
 
@@ -1720,7 +1767,10 @@ ApplyMath <-
       use_label_plot_ticks
     )
     use_virtical_line_type <-
-      c(3, 3, 1, 1)  # TODO add change virtical line type
+       c(as.character(tclvalue(tcl_tss_tts_line_type)), 
+         as.character(tclvalue(tcl_tss_tts_line_type)), 
+         as.character(tclvalue(tcl_body_line_type)),
+         as.character(tclvalue(tcl_body_line_type)))  
     use_virtical_line_color <- c("green", "red", "black", "black")
     use_plot_breaks_labels <-
       use_plot_breaks_labels[!is.na(use_plot_breaks)]
@@ -2713,16 +2763,6 @@ tkadd(
     ClearTableFile()
 )
 tkadd(menu_top, "cascade", label = "File", menu = menu_top_file)
-menu_top_options <- tkmenu(menu_top, tearoff = FALSE)
-tkadd(
-  menu_top_options,
-  "command",
-  label = "Set Options",
-  command = function()
-    GlobalOptions()
-)
-
-tkadd(menu_top, "cascade", label = "Extra's", menu = menu_top_options)
 
 # FILE frame for loading files and main controls ----
 
@@ -3034,9 +3074,21 @@ tkgrid(
     command = function()
       GetColor()
   ),
+  columnspan = 5,
+  pady = c(10, 10)
+)
+
+tkgrid(
+  tk2button(
+    tab_plot_options_frame,
+    text = '   Extra Options   ',
+    command = function()
+     GlobalOptions()
+  ),
   columnspan = 4,
   pady = c(10, 10)
 )
+
 
 tkgrid(
   tab_plot_options_frame,

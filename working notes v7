@@ -2,17 +2,11 @@ Ben tools v7
 
 http://www.sciviews.org/recipes/tcltk/toc/
 
-need to move Global options to a button and off dropdown as it causes probles making and focusing windows
 
-add opition to change vertcal line types? # 1379 use_virtical_line_type <- c(3,3,1,1)  # TODO add change virtical line type
-c("dotted","dotted","solid","solid")
 
-add quantile cutoff signal filter to sort tool options
+add quick filter to sort (mean of gene is > mean of all genes)
 
-Add find max within range tool? after combinding range and region tools
-
-need to fix remove file if name in gene list is diffrent then in common gene list
-
+add save button to grab tool tab
 
 ####### version C?########
 add a higher level of notbook and group simular tools together?
@@ -24,7 +18,7 @@ add a higher level of notbook and group simular tools together?
 get some basic sticky and weighting set up for sizeing 
 ... move grid to proper places
 
-add save button to grab tool tab
+
 add controls in Opiontions popup a place for handaling NA and 0  when loading and deviding?
 #############################
 
@@ -47,3 +41,8 @@ Update switching plot lines in Options now updates the bin tabs in the tools
 removed major brakes in plot ie grid lines
 add label helper function to lines and labels tab
 added two sidded ks.test if two files are used in cdf tool
+combind region and ration
+add max signal (peak) tools
+move Global options to a button and removed dropdown menu
+add opition to change vertcal line types 
+fix remove file if name in gene list is diffrent
