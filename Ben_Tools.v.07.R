@@ -2061,43 +2061,43 @@ SortFindMaxPeaks <- function() {
         which.max(x))
     df[[nick_name1[2]]] <<- df[[nick_name1[2]]][findInterval(ttt, c(R_start_bin, R_end_bin), rightmost.closed = T) == 1L,]
     ttt <- ttt[findInterval(ttt, c(R_start_bin, R_end_bin), rightmost.closed = T) == 1L]
-    # tt <- summary(ttt)
-    # print(tt)
     if (lc == 0) {
-      print("use top entry cluster max bins")
+      #hist(ttt)
+      print("use top entry max bins")
       print(nick_name1[2])
-      tt <<-
-        sort(c(round(kmeans(
-          ttt,
-          centers = 4, #c(tt[[1]], tt[[2]], tt[[3]], tt[[4]], tt[[5]], tt[[6]]),
-          nstart = 200
-        )$center)))
-      #print(c(round(xx$center)))
+      tt <<- summary(ttt)
+      print(tt)
+      # tt <<-
+      #   sort(c(round(kmeans(
+      #     ttt,
+      #     centers = 4, #c(tt[[1]], tt[[2]], tt[[3]], tt[[4]], tt[[5]], tt[[6]]),
+      #     nstart = 200
+      #   )$center)))
     }
-    tcl_peaks1file <<- tclVar(paste("max bins center", tt[[1]]))
-    tcl_peaks2file <<- tclVar(paste("max bins center", tt[[2]]))
-    tcl_peaks3file <<- tclVar(paste("max bins center", tt[[3]]))
-    tcl_peaks4file <<- tclVar(paste("max bins center", tt[[4]]))
+    tcl_peaks1file <<- tclVar(paste(names(tt)[2], "max bins center", floor(tt[[2]])))
+    tcl_peaks2file <<- tclVar(paste(names(tt)[3], "max bins center", floor(tt[[3]])))
+    tcl_peaks3file <<- tclVar(paste(names(tt)[4], "max bins center", floor(tt[[4]])))
+    tcl_peaks4file <<- tclVar(paste(names(tt)[5], "max bins center", floor(tt[[5]])))
     enesg1 <<-
       c(enesg1, df[[nick_name1[2]]][findInterval(ttt, c(
-        floor(tt[[1]] - Start_peak_width),
-        ceiling(tt[[1]] + Start_peak_width)
+        floor(tt[[2]] - Start_peak_width),
+        floor(tt[[2]] + Start_peak_width)
       ), rightmost.closed = T) ==
         1L, 1])
     enesg2 <<-
       c(enesg2, df[[nick_name1[2]]][findInterval(ttt, c(
-        floor(tt[[2]] - Start_peak_width),
-        ceiling(tt[[2]] + Start_peak_width)
+        floor(tt[[3]] - Start_peak_width),
+        floor(tt[[3]] + Start_peak_width)
       ), rightmost.closed = T) == 1L, 1])
     enesg3 <<-
       c(enesg3, df[[nick_name1[2]]][findInterval(ttt, c(
-        floor(tt[[3]] - Start_peak_width),
-        ceiling(tt[[3]] + Start_peak_width)
+        floor(tt[[4]] - Start_peak_width),
+        floor(tt[[4]] + Start_peak_width)
       ), rightmost.closed = T) == 1L, 1])
     enesg4 <<-
       c(enesg4, df[[nick_name1[2]]][findInterval(ttt, c(
-        floor(tt[[4]] - Start_peak_width),
-        ceiling(tt[[4]] + Start_peak_width)
+        floor(tt[[5]] - Start_peak_width),
+        floor(tt[[5]] + Start_peak_width)
       ), rightmost.closed = T) == 1L, 1])
     if (lc > 0) {
       enesg1 <<- unique(enesg1[duplicated(enesg1)])
@@ -2106,8 +2106,6 @@ SortFindMaxPeaks <- function() {
       enesg4 <<- unique(enesg4[duplicated(enesg4)])
     }
     lc <<- lc + 1
-    enesg5 <<- c(enesg1, enesg2, enesg3, enesg4, enesg5)
-    enesg5 <<- enesg5[duplicated(enesg5)]
   })
   
   for (i in 1:4) {
@@ -2118,10 +2116,12 @@ SortFindMaxPeaks <- function() {
     gene_list_label <- get(paste("label_peaks_list", i, sep = ""))
     gene_list <- get(paste("listbox_gene_peaks_list", i, sep = ""))
     my_gene_list <- unlist(get(paste("enesg", i, sep = "")))
-    if (length(enesg5) > 0 & length(my_gene_list) > 0) {
-      my_gene_list <- my_gene_list[!duplicated(c(my_gene_list, enesg5),fromLast = T)[1:length(my_gene_list)]]  
+    enesg <- c(my_gene_list, enesg5)
+    enesg <- enesg[duplicated(enesg)]
+    if (length(enesg) > 0 & length(my_gene_list) > 0) {
+      my_gene_list <- my_gene_list[!duplicated(c(my_gene_list, enesg),fromLast = T)[1:length(my_gene_list)]] 
     }
-    
+    enesg5 <- c(my_gene_list, enesg5)
     if (length(my_gene_list) > 0) {
       clist[[paste("peaks", i, sep = "")]]$use <- my_gene_list
       color_select <- kListColorSet[color_safe]
@@ -4509,7 +4509,7 @@ tkgrid(
 tkgrid(
   tk2button(
     frame_peaks_tab_buttons,
-    text = " peak kmeans ",
+    text = " peak quartile ",
     command =  function()
       SortFindMaxPeaks()
   ),
