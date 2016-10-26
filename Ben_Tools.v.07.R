@@ -60,7 +60,7 @@ kBrewerList <-
     "Set2",
     "Set3")
 kListColorSet <- brewer.pal(8, kBrewerList[3])
-kMathOptions <- c("mean", "sum", "median")
+kMathOptions <- c("mean", "sum", "median", "variance")
 kTopBottomOptions <- c("Top%", "Bottom%")
 kInOutOptions <- c("inclusive", "exclusive")
 kTopBottomNum <- c(1, 2, seq(5, 95, by = 5), 99, 100)
@@ -1671,6 +1671,10 @@ ApplyMath <-
       use_apply <- function(x)
         apply(x, 2, median, na.rm = TRUE)
       use_y_label <- "Median of bin counts"
+    } else if (use_math == "variance"){
+      use_apply <- function(x) 
+        apply(x, 2, var, na.rm = TRUE)
+      use_y_label <- "Variance of bin counts"
     }
     
     # set normilization to relative frequency or bin number or 1 for none,

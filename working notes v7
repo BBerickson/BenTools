@@ -2,9 +2,26 @@ Ben tools v7
 
 http://www.sciviews.org/recipes/tcltk/toc/
 
-add quick filter to sort (mean of gene is > mean of all genes)
+learn dplyr and implement 
+
+loading gene lists need to reset tools?
+
+peaks ... plot hist? use devide fold change to find genes/sets with consistant genes max locations (keep both gene sets?)
+
+LableMaker protection on what can be entered
+
+clear selceted item
+
+activate button takes top number of accsetpet items
+
+add more tips
+
+peak savegenelist update items recorded .... test all save note layouts
 
 add save button to grab tool tab
+
+add quick filter to sort (mean of gene is > mean of all genes)
+
 
 ####### version C?########
 add a higher level of notbook and group simular tools together?
@@ -44,3 +61,4 @@ add max signal (peak) tools
 move Global options to a button and removed dropdown menu
 add opition to change vertcal line types 
 fix remove file if name in gene list is diffrent
+add Variance to plot math
