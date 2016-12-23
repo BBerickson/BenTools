@@ -2,7 +2,23 @@ Ben tools v7
 
 http://www.sciviews.org/recipes/tcltk/toc/
 
-learn dplyr and implement 
+
+before releacing ... wrap in funtion
+
+find faster intervile intersect pipeline
+
+peak hist plots
+
+add save button to grab tool tab
+
+new ggplot ...
+subtiles and capton ... can add back title option for peaple
+legend spacing look at update
+try facet plotting multiple plots?
+
+
+smarter x lables 
+loading gene lists check if all others are off then they are off as well
 
 loading gene lists need to reset tools?
 
@@ -10,31 +26,28 @@ peaks ... plot hist? use devide fold change to find genes/sets with consistant g
 
 LableMaker protection on what can be entered
 
-clear selceted item
-
-activate button takes top number of accsetpet items
-
 add more tips
 
 peak savegenelist update items recorded .... test all save note layouts
 
-add save button to grab tool tab
+##############
+changes in C
+##############
 
+add readr to load files and load gene 
+can load mapped bedGraph files 6 or 3 colunms 
+dplyr conversion
+y plot controls
+norm factor option
+Activate files button now loads files if no item is selected from the active common gene list
+fixed clear files activity to remove ether selected file(s) or all files
+update some save file info
 add quick filter to sort (mean of gene is > mean of all genes)
+grep load gene list option
+sort gene list now separates by number of bp
+plot smoothing
+can load files by URLs listed in a text.url file
 
-
-####### version C?########
-add a higher level of notbook and group simular tools together?
-  sort, quantil
-  region, ratios, cdf
-  cluster
-  intersect
-
-get some basic sticky and weighting set up for sizeing 
-... move grid to proper places
-
-
-add controls in Opiontions popup a place for handaling NA and 0  when loading and deviding?
 #############################
 
 changes in B
