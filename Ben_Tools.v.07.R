@@ -2012,7 +2012,9 @@ ApplyMath <-
     names(use_col) <- use_nickname
     names(use_dot) <- use_nickname
     names(use_line) <- use_nickname
-    
+    (tclvalue(tcl_smooth) == 1){
+      use_y_label <- paste0("smoothed(", use_y_label, ")")
+    }
     setTkProgressBar(pb, 75, label = paste(round(75, 0), "Applied Math"))
     GGplotF(
       list_long_data_frame,
