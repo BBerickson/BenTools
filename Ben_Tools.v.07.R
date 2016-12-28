@@ -909,8 +909,12 @@ LoadTableFile <- function() {
         
         tablefile <- suppressMessages(read_tsv (x,
                                                 col_names = c("gene", 1:(num_bins)),
-                                                skip = 1) %>% gather(., bin, score, 2:(num_bins + 1))) %>% mutate(set = gsub("(.{17})", "\\1\n", legend_nickname),
-                                                                                                                  bin = as.numeric(bin)) %>% na_if(Inf)
+                                                skip = 1) %>% 
+                                        gather(., bin, score, 2:(num_bins + 1))) %>% 
+          mutate(set = gsub("(.{17})", "\\1\n", legend_nickname), 
+                 bin = as.numeric(bin), 
+                 score = as.numeric(score)) %>% 
+          na_if(Inf)
       }
       if (file_count > 0) {
         if (!exists("gene_names")) {
