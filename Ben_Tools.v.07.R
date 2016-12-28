@@ -1050,7 +1050,7 @@ LoadGeneFile <- function(listboxname) {
     if (length(enesg) == 0) {
       tcl_answer <-
         tkmessageBox(
-          message = "Can't find full name matches, want to try a partial match (takes a long time)?",
+          message = "Can't find full name matches, want to try a partial match (takes some time)?",
           icon = "question",
           type = "yesnocancel",
           default = "no"
@@ -2012,7 +2012,7 @@ ApplyMath <-
     names(use_col) <- use_nickname
     names(use_dot) <- use_nickname
     names(use_line) <- use_nickname
-    (tclvalue(tcl_smooth) == 1){
+    if(tclvalue(tcl_smooth) == 1){
       use_y_label <- paste0("smoothed(", use_y_label, ")")
     }
     setTkProgressBar(pb, 75, label = paste(round(75, 0), "Applied Math"))
