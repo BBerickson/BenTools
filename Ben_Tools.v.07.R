@@ -921,12 +921,11 @@ LoadTableFile <- function() {
           gene_names <- LIST_DATA$gene_file$common$full
         }
         zero_genes <-
-          group_by(tablefile, gene) %>% summarise(test = sum(score, na.rm = T)) %>% filter(test ==
+          group_by(tablefile, gene) %>% summarise(test = sum(score, na.rm = T)) %>% filter(test !=
                                                                                              0)
-        zero_genes <-
-          c(collapse(distinct(tablefile, gene))[[1]], zero_genes$gene)
-        zero_genes <- zero_genes[!duplicated(zero_genes)]
-        gene_names <- c(zero_genes, gene_names)
+        tablefile <- semi_join(tablefile, zero_genes, by = "gene")                                       
+        gene_names <-
+          c(collapse(distinct(tablefile, gene))[[1]], gene_names)
         gene_names <- gene_names[duplicated(gene_names)]
         
         
@@ -945,11 +944,10 @@ LoadTableFile <- function() {
       } else {
         # first time loading a file set up
         zero_genes <-
-          group_by(tablefile, gene) %>% summarise(test = sum(score, na.rm = T)) %>% filter(test ==
+          group_by(tablefile, gene) %>% summarise(test = sum(score, na.rm = T)) %>% filter(test !=
                                                                                              0)
-        zero_genes <-
-          c(collapse(distinct(tablefile, gene))[[1]], zero_genes$gene)
-        gene_names <- zero_genes[!duplicated(zero_genes)]
+        tablefile <- semi_join(tablefile, zero_genes, by = "gene")
+        gene_names <- collapse(distinct(tablefile, gene))[[1]]
         LIST_DATA$gene_file$common$full <<- gene_names
         LIST_DATA$gene_info$common[[legend_nickname]] <<-
           c(kDotOptions[1],
