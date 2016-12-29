@@ -2212,6 +2212,7 @@ SortTop <- function() {
   # for item in active list make sorted list, then merge sort=T, then pull out request
   lc <- 0
   outlist <- NULL
+  split_test = FALSE
   nick_name <- as.character(tkget(listbox_active_sort, 0, 'end'))
   lapply(nick_name, function(j) {
     nick_name2 <- strsplit(sub('-', '\n!', j), '\n!')[[1]]
@@ -2221,13 +2222,22 @@ SortTop <- function() {
       data_frame(gene = LIST_DATA$gene_file[[nick_name2[1]]]$use)
     df <-
       semi_join(LIST_DATA$table_file[[my_ref]], enesg, by = 'gene')
+    
+    if(length(sub("(-)", "~\\1~", df$gene[1])) > 1){
+      split_test <<- TRUE
     apply_bins <- group_by(df, gene) %>%
       filter(bin %in% R_start_bin:R_end_bin) %>%
       summarise(mysums = sum(score, na.rm = TRUE)) %>%
       mutate(myper = percent_rank(mysums),
              gene = gsub("(:|\\-;|\\+;)", "~\\1~", sub("(-)", "~\\1~", gene))) %>%
       ungroup()
-    
+    } else {
+      apply_bins <- group_by(df, gene) %>%
+        filter(bin %in% R_start_bin:R_end_bin) %>%
+        summarise(mysums = sum(score, na.rm = TRUE)) %>%
+        mutate(myper = percent_rank(mysums)) %>%
+        ungroup()
+    }
     gene_count <- nrow(apply_bins)
     
     if (R_option == "Top%") {
@@ -2249,6 +2259,8 @@ SortTop <- function() {
     }
     lc <<- lc + 1
   })
+  
+  if(split_test){
   outlist <-
     separate(outlist,
              gene,
@@ -2256,10 +2268,15 @@ SortTop <- function() {
              "~",
              convert = T) %>%
     arrange(chr, s)
+  }
   
   if (!suppressWarnings(is.na(as.numeric(tclvalue(
     tkget(entry_dist_span)
   ))))) {
+    if(split_test){
+      tkmessageBox(message = "no chr start and stop to messure the distance between genes", icon = "info")
+      return()
+    }
     dist_span <- as.numeric(tclvalue(tkget(entry_dist_span)))
     setTkProgressBar(pb,
                      nrow(outlist),
@@ -2293,6 +2310,8 @@ SortTop <- function() {
       outlist <- slice(outlist,-too_close)
     }
   }
+  
+  if(split_test){
   outlist <-
     unite(outlist,
           col = gene,
@@ -2304,7 +2323,7 @@ SortTop <- function() {
           sign,
           gene,
           sep = "") %>% arrange(desc(mysums))
-  
+  }
   if (R_order == 'Accend') {
     outlist$gene <- rev(outlist$gene)
   }
