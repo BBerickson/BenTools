@@ -225,7 +225,7 @@ LIST_DATA <- list(
   gene_file = list(),
   # holds $common genes from files and $gene file(s)
   gene_info = list(),
-  # for holding gene file info in a list of lists, a set for $common and each $gene file(s) [c("dot", "line", "color", plot?, NickName)]
+  # for holding gene file info in a list of lists, a set for $common and each $gene file(s) [c("dot", "line", "color", plot?, NickName,nrom)]
   clust = list()
 )      # Cluster holder
 
@@ -696,7 +696,8 @@ ToolListTabHelper <-
             kLineOptions[1],
             LIST_DATA$gene_info$common[[i]][3],
             1,
-            LIST_DATA$gene_info$common[[i]][5]
+            LIST_DATA$gene_info$common[[i]][5],
+            "none"
           ))
       
       tclvalue(tcl_toolfile) <<- legend_nickname
@@ -960,7 +961,7 @@ LoadTableFile <- function() {
             kLineOptions[1],
             kListColorSet[1],
             1,
-            legend_nickname)
+            legend_nickname,"none")
         SetComboBoxes(num_bins) # fills out and sets start and stop bins
       }
       color_safe <-
@@ -977,7 +978,8 @@ LoadTableFile <- function() {
                                     kLineOptions[1],
                                     color_select,
                                     1,
-                                    legend_nickname)
+                                    legend_nickname,
+                                    "none")
           k
         })
       
@@ -1129,7 +1131,8 @@ LoadGeneFile <- function(listboxname) {
           kLineOptions[1],
           LIST_DATA$gene_info$common[[i]][3],
           1,
-          LIST_DATA$gene_info$common[[i]][5]
+          LIST_DATA$gene_info$common[[i]][5],
+          "none"
         ))
     tclvalue(myTCL) <- legend_nickname
     tkconfigure(label_file, textvariable = myTCL)
@@ -1750,7 +1753,8 @@ MakeNormFile <- function() {
           kLineOptions[1],
           kListColorSet[color_safe],
           1,
-          paste(mynom, mydnom, sep = "/"))
+          paste(mynom, mydnom, sep = "/"),
+          "none")
     }
     
     sapply(names(LIST_DATA$gene_file), function(x) {
@@ -2881,6 +2885,7 @@ handleColorSel <- function(in_list, list_set) {
     myline <- LIST_DATA$gene_info[[list_set]][[nick_name]][2]
     mycolor <- LIST_DATA$gene_info[[list_set]][[nick_name]][3]
     myname <- LIST_DATA$gene_info[[list_set]][[nick_name]][5]
+    my_norm <- LIST_DATA$gene_info[[list_set]][[nick_name]][6]
     tmp <- mycolor
     OnUpdate <- function() {
       DActAll()
@@ -2910,8 +2915,11 @@ handleColorSel <- function(in_list, list_set) {
         LIST_DATA$gene_info[[list_set]][[new_name]][3] <<- tmp
         tkitemconfigure(in_list, sel, foreground = tmp)
         norm_factor <- tclvalue(tkget(EntryNormFactor))
+        if (my_norm != norm_factor){
+          LIST_DATA$gene_info[[list_set]][[new_name]][6] <<- norm_factor
+        }
         if (!suppressWarnings(is.na(as.numeric(norm_factor))) &
-            norm_factor != 0) {
+            norm_factor != 0 & norm_factor != 1) {
           LIST_DATA$table_file[[myname]] <<-
             mutate(LIST_DATA$table_file[[myname]],
                    score = score / as.numeric(norm_factor))
@@ -2971,7 +2979,7 @@ handleColorSel <- function(in_list, list_set) {
       pady = c(10, 10),
       sticky = "w"
     )
-    
+    tkinsert(EntryNormFactor, 0, my_norm)
     tkgrid(tklabel(SampleOptionsFrame, text = "line"), padx = c(0, 0))
     combobox_lines <- tk2combobox(
       SampleOptionsFrame,
