@@ -861,7 +861,7 @@ LoadTableFile <- function() {
   }
   pb <- tkProgressBar(title = "Loading file, please be patient!!",
                       width = 500)
-  if(length(full_file_name) == 1 && length(grep(".url$",full_file_name))==1){
+  if(length(full_file_name) == 1 && length(grep(".url",full_file_name))==1){
     full_file_name <- read_lines(full_file_name)
   }
   gene_list <- NULL
