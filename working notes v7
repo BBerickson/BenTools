@@ -2,11 +2,7 @@ Ben tools v7
 
 http://www.sciviews.org/recipes/tcltk/toc/
 
-
-remove gene(s) from intersect list tkdelet(listbox, for i in select)
-remove sum 0 from file
-
-add a test to sort split string and sepration
+ues lines and lables funtion to replace standareds 
 
 before releacing ... wrap in funtion
 

@@ -16,6 +16,7 @@ my_packages <- function(x) {
     if (!require(i , character.only = TRUE)) {
       #  If package was not able to be loaded then re-install
       install.packages(i , dependencies = TRUE)
+      print(paste("installing ", i, " : please wait"))
       #  Load package after installing
       require(i , character.only = TRUE)
     }
@@ -6596,3 +6597,5 @@ tkbind(root, "<FocusIn>", function()
   OpenWindowControl())
 # }
 # expandTk()
+print("Don't forget to update R and its packages every now and then")
+print(version_num)
