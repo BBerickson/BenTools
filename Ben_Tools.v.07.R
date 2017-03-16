@@ -1831,7 +1831,8 @@ MakeDataFrame <-
           list_data_frame[[i]] <-
             bind_rows(table_file[tf]) %>%
             semi_join(., enesg, by = "gene") %>%
-            mutate(., set = paste(gsub("(.{17})", "\\1\n", myTCL), set, sep = '-\n'))
+            mutate(., set = paste(gsub("(.{17})", "\\1\n", myTCL),paste("n = ",
+                                                                        length(enesg[[1]])), set, sep = '\n'))
           
           dots <-
             match(sapply(gene_info[[i]][tf], "[[", 1), kDotOptions)
@@ -2135,7 +2136,7 @@ GGplotF <-
         legend.title = element_blank(),
         legend.key = element_rect(size = 5, color = 'white'),
         legend.key.height = unit(legend_space, "line"),
-        legend.text = element_text(size = 11)
+        legend.text = element_text(size = 10)
       ) +
       coord_cartesian(xlim = use_plot_limits, ylim = unlist(use_y_limits))
     setTkProgressBar(pb, 99, label = paste(round(100, 0), "Ready to plot"))
@@ -2171,7 +2172,7 @@ GGplotC <-
         legend.title = element_blank(),
         legend.key = element_rect(size = 5, color = 'white'),
         legend.key.height = unit(legend_space, "line"),
-        legend.text = element_text(size = 11)
+        legend.text = element_text(size = 10)
       ) # + coord_cartesian(xlim = c(-4,6))
     print(gp)
     
