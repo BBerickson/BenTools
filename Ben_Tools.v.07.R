@@ -93,11 +93,7 @@ kLineType <- c("dotted", "solid")
 list_plot_lines <-
   list(
     "543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
-<<<<<<< HEAD
-    "543 bins 20,40,40" = c(15.5, 65.5, 40.5, 20.5),
-=======
-    "543 bins 20,40,40" = c(15.5, 65.5, 40.5, 60.5),
->>>>>>> 2ac1c8605b4448e8acf361ebec90ae6b0f0528d0
+    "543 bins 20,40,40" = c(15.5, 65.5, 20.5, 60.5),
     "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5),
     "543 5k_.5k_.5k_1.5k_20bin_20bin_40bin" = c(10.5, 50.5, 20.5, 40.5),
     "5 prim 2k 2k 40bins" = c(20.5, 0, 0, 0),
@@ -2127,7 +2123,7 @@ GGplotF <-
       theme(panel.grid.minor = element_blank(),
             panel.grid.major = element_blank()) +
       theme(axis.title.y = element_text(size =  15)) +
-      theme(axis.title.x = element_text(size =  10, vjust = .5)) +
+      theme(axis.title.x = element_text(size =  13, vjust = .5)) +
       theme(axis.text.x = element_text(
         size = 12,
         angle = -45,
@@ -2139,7 +2135,7 @@ GGplotF <-
         legend.title = element_blank(),
         legend.key = element_rect(size = 5, color = 'white'),
         legend.key.height = unit(legend_space, "line"),
-        legend.text = element_text(size = 9)
+        legend.text = element_text(size = 11)
       ) +
       coord_cartesian(xlim = use_plot_limits, ylim = unlist(use_y_limits))
     setTkProgressBar(pb, 99, label = paste(round(100, 0), "Ready to plot"))
@@ -2163,7 +2159,7 @@ GGplotC <-
       theme_bw() +
       theme(legend.title = element_blank()) +
       theme(axis.title.y = element_text(size =  15)) +
-      theme(axis.title.x = element_text(size =  10, vjust = .5)) +
+      theme(axis.title.x = element_text(size =  13, vjust = .5)) +
       theme(axis.text.x = element_text(
         size = 12,
         angle = -45,
@@ -2175,7 +2171,7 @@ GGplotC <-
         legend.title = element_blank(),
         legend.key = element_rect(size = 5, color = 'white'),
         legend.key.height = unit(legend_space, "line"),
-        legend.text = element_text(size = 9)
+        legend.text = element_text(size = 11)
       ) # + coord_cartesian(xlim = c(-4,6))
     print(gp)
     
