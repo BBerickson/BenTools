@@ -2,6 +2,8 @@ Ben tools v7
 
 http://www.sciviews.org/recipes/tcltk/toc/
 
+readinging in URL files ignore blank lines
+
 ues lines and lables funtion to replace standareds 
 
 before releacing ... wrap in funtion
@@ -12,7 +14,7 @@ add save button to grab tool tab
 
 new ggplot ...
 subtiles and capton ... can add back title option for peaple
-legend spacing look at update
+legend spacing look at update and sizing
 try facet plotting multiple plots?
 
 
