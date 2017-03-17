@@ -3195,13 +3195,13 @@ tkgrid(
   ),
   tk2button(
     frame_notebook_load_file_tab,
-    text = "  <<All On>>  ",
+    text = "  <<List ON>>  ",
     command = function()
       MoveAllToOtherEntry(listbox_common_on, listbox_common_off, "on")
   ),
   tk2button(
     frame_notebook_load_file_tab,
-    text = "  <<All Off>>  ",
+    text = "  <<List Off>>  ",
     command = function()
       MoveAllToOtherEntry(listbox_common_on, listbox_common_off, "off")
   ),
@@ -4058,13 +4058,13 @@ tkgrid(
   ),
   tk2button(
     frame_gene1_tab,
-    text = "<<All On>>",
+    text = "<<List ON>>",
     command = function()
       MoveAllToOtherEntry(listbox_gene1_on, listbox_gene1_off, "on", file_name = "gene1")
   ),
   tk2button(
     frame_gene1_tab,
-    text = "<<All Off>>",
+    text = "<<List Off>>",
     command = function()
       MoveAllToOtherEntry(listbox_gene1_on, listbox_gene1_off, "off", file_name = "gene1")
   ),
@@ -4150,13 +4150,13 @@ tkgrid(
   ),
   tk2button(
     frame_gene2_tab,
-    text = "<<All On>>",
+    text = "<<List ON>>",
     command = function()
       MoveAllToOtherEntry(listbox_gene2_on, listbox_gene2_off, "on", file_name = "gene2")
   ),
   tk2button(
     frame_gene2_tab,
-    text = "<<All Off>>",
+    text = "<<List Off>>",
     command = function()
       MoveAllToOtherEntry(listbox_gene2_on, listbox_gene2_off, "off", file_name = "gene2")
   ),
@@ -4242,13 +4242,13 @@ tkgrid(
   ),
   tk2button(
     frame_gene3_tab,
-    text = "<<All On>>",
+    text = "<<List ON>>",
     command = function()
       MoveAllToOtherEntry(listbox_gene3_on, listbox_gene3_off, "on", file_name = "gene3")
   ),
   tk2button(
     frame_gene3_tab,
-    text = "<<All Off>>",
+    text = "<<List Off>>",
     command = function()
       MoveAllToOtherEntry(listbox_gene3_on, listbox_gene3_off, "off", file_name = "gene3")
   ),
@@ -4334,13 +4334,13 @@ tkgrid(
   ),
   tk2button(
     frame_gene4_tab,
-    text = "<<All On>>",
+    text = "<<List ON>>",
     command = function()
       MoveAllToOtherEntry(listbox_gene4_on, listbox_gene4_off, "on", file_name = "gene4")
   ),
   tk2button(
     frame_gene4_tab,
-    text = "<<All Off>>",
+    text = "<<List Off>>",
     command = function()
       MoveAllToOtherEntry(listbox_gene4_on, listbox_gene4_off, "off", file_name = "gene4")
   ),
@@ -4426,13 +4426,13 @@ tkgrid(
   ),
   tk2button(
     frame_tool_tab,
-    text = "<<All On>>",
+    text = "<<List ON>>",
     command = function()
       MoveAllToOtherEntry(listbox_tool_on, listbox_tool_off, "on", file_name = "tool")
   ),
   tk2button(
     frame_tool_tab,
-    text = "<<All Off>>",
+    text = "<<List Off>>",
     command = function()
       MoveAllToOtherEntry(listbox_tool_on, listbox_tool_off, "off", file_name = "tool")
   ),
