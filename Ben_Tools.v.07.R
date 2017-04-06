@@ -921,11 +921,7 @@ LoadTableFile <- function() {
             break ()
           }
         }
-        # tablefile <- suppressMessages(read_tsv (x,
-        #                                         col_names = c("gene", 1:(num_bins)),
-        #                                         skip = 1, n_max = 5))
-        # if(sum(is.na(tablefile[,num_bins+1])) == 5){
-        # }
+        
          
         tablefile <- suppressMessages(read_tsv (x,
                                                 col_names = c("gene", 1:(num_bins)),
@@ -933,8 +929,12 @@ LoadTableFile <- function() {
                                         gather(., bin, score, 2:(num_bins + 1))) %>% 
           mutate(set = gsub("(.{17})", "\\1\n", legend_nickname), 
                  bin = as.numeric(bin), 
-                 score = as.numeric(score)) %>% 
-          na_if(Inf)
+                 score = as.numeric(score)) %>%
+          na_if(Inf) %>% 
+          # remove all rows that are NA
+          filter(Reduce(`+`, lapply(., is.na)) != ncol(.)) 
+        
+        num_bins <- collapse(summarise(tablefile, max(bin)))[[1]]
       }
       if (file_count > 0) {
         if (!exists("gene_names")) {
