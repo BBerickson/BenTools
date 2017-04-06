@@ -915,17 +915,24 @@ LoadTableFile <- function() {
           }
         }
       } else{
+        tablefile <- suppressMessages(read_tsv (x,
+                                                col_names = c("gene", 1:(num_bins)),
+                                                skip = 1, n_max = 5))
+        if(sum(is.na(tablefile[,num_bins+1])) == 5){
+          test <- TRUE
+          num_bins2 <- num_bins - 1
+        } else {
+          test <- FALSE
+          num_bins2 <- num_bins
+        }
+       
         if (file_count > 0) {
-          if (summarise(LIST_DATA$table_file[[1]], n_distinct(bin)) != num_bins) {
+          if (summarise(LIST_DATA$table_file[[1]], n_distinct(bin)) != num_bins2) {
             tkmessageBox(message = "Can't load file, different number of bins", icon = "error")
             break ()
           }
         }
-        # tablefile <- suppressMessages(read_tsv (x,
-        #                                         col_names = c("gene", 1:(num_bins)),
-        #                                         skip = 1, n_max = 5))
-        # if(sum(is.na(tablefile[,num_bins+1])) == 5){
-        # }
+        
          
         tablefile <- suppressMessages(read_tsv (x,
                                                 col_names = c("gene", 1:(num_bins)),
@@ -933,8 +940,14 @@ LoadTableFile <- function() {
                                         gather(., bin, score, 2:(num_bins + 1))) %>% 
           mutate(set = gsub("(.{17})", "\\1\n", legend_nickname), 
                  bin = as.numeric(bin), 
-                 score = as.numeric(score)) %>% 
+                 score = as.numeric(score)) %>%
           na_if(Inf)
+        
+        if(test){
+          tablefile <- tablefile %>% filter(., bin != num_bins)
+        }
+        
+        num_bins <- collapse(summarise(tablefile, max(bin)))[[1]]
       }
       if (file_count > 0) {
         if (!exists("gene_names")) {
