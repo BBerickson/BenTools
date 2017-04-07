@@ -798,6 +798,7 @@ ActLst <- function(ActList,
                    MyMax,
                    listboxgenes,
                    listboxlengths) {
+  # clear out and reset gene list
   if (!is.null(listboxgenes)) {
     for (i in listboxgenes) {
       tkdelete(get(i), 0, "end")
@@ -807,17 +808,20 @@ ActLst <- function(ActList,
     for (i in listboxlengths) {
       tkconfigure(get(i), text = paste("n = 0"))
     }
-    return()
   }
   InList <- get(paste("listbox_" , STATE[2], "_on", sep = ""))
   sel <- as.integer((tkcurselection(InList)))
-  if (length(sel) == 0) {
+  outList <- get(paste("listbox_" , STATE[2], "_off", sep = ""))
+  sel2 <- as.integer(tkcurselection(outList))
+  if (length(sel) == 0 & length(sel2) == 0) {
     if (MyMax == 0) {
       sel <- c(0:(as.integer(tclvalue(
         tksize(InList)
       )) - 1))
     } else{
-      sel <- c(0:(MyMax - 2))
+      sel <- c(0:(min(MyMax - 2, (as.integer(tclvalue(
+        tksize(InList)
+      )) - 1))))
     }
   }
   for (i in sel) {
@@ -827,9 +831,7 @@ ActLst <- function(ActList,
       tkdelete(ActList, "end")
     }
   }
-  outList <- get(paste("listbox_" , STATE[2], "_off", sep = ""))
-  sel <- as.integer(tkcurselection(outList))
-  for (i in sel) {
+  for (i in sel2) {
     new_name <- paste(STATE[2], tclvalue(tkget(outList, i)), sep = '-')
     tkinsert(ActList, 0, new_name)
     if (as.integer(tksize(ActList)) == MyMax) {
