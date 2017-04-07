@@ -943,6 +943,7 @@ LoadTableFile <- function() {
                  score = as.numeric(score)) %>%
           na_if(Inf)
         
+        
         if(test){
           tablefile <- tablefile %>% filter(., bin != num_bins)
         }
