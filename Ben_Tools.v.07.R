@@ -861,7 +861,7 @@ LoadTableFile <- function() {
   full_file_name <-
     paste(as.character(
       tkgetOpenFile(multiple = TRUE, filetypes =
-                      "{{Table Files} {.table .tab .Table}} {{All files} *}"))
+                      "{{Table Files} {.table .tab .Table .url.txt}} {{All files} *}"))
     )
   STATE[1] <<- 0
   if (length(full_file_name) == 0) {
@@ -943,7 +943,8 @@ LoadTableFile <- function() {
           mutate(set = gsub("(.{17})", "\\1\n", legend_nickname), 
                  bin = as.numeric(bin), 
                  score = as.numeric(score)) %>%
-          na_if(Inf)
+          na_if(Inf)%>%
+          replace_na(list(score = 0))
         
         
         if(test){
@@ -1107,13 +1108,7 @@ LoadGeneFile <- function(listboxname) {
             width = 300
           )
         enesg <-
-          unique(names(unlist(
-            sapply(
-              LIST_DATA$gene_file$common$full,
-              grep,
-              genefile$gene[!duplicated(genefile$gene)]
-            )
-          )))
+          unique(grep(paste(genefile$gene, collapse = "|"), LIST_DATA$gene_file$common$use, value = T))
         genefile <- data.frame(gene = enesg)
         if (length(enesg) == 0) {
           tkmessageBox(message = "Still can't find any matching genes",
@@ -1751,8 +1746,7 @@ MakeNormFile <- function() {
     # replace 0's with min/2
     new_gene_list <-
       replace_na(new_gene_list,
-                 list(score.x = new_min_for_na,
-                      score.y = new_min_for_na))
+                 list(score.y = new_min_for_na))
     setTkProgressBar(pb, 50, label = paste(round(50, 0),
                                            "deviding one by other"))
     LIST_DATA$table_file[[paste(mynom, mydnom, sep = "/")]] <<-
@@ -2263,7 +2257,7 @@ SortTop <- function() {
     df <-
       semi_join(LIST_DATA$table_file[[my_ref]], enesg, by = 'gene')
     
-    if(length(sub("(-)", "~\\1~", df$gene[1])) > 1){
+    if(length(strsplit(df$gene[1],"-")[[1]]) > 1){
       split_test <<- TRUE
     apply_bins <- group_by(df, gene) %>%
       filter(bin %in% R_start_bin:R_end_bin) %>%
@@ -2313,7 +2307,7 @@ SortTop <- function() {
   if (!suppressWarnings(is.na(as.numeric(tclvalue(
     tkget(entry_dist_span)
   ))))) {
-    if(split_test){
+    if(!split_test){
       tkmessageBox(message = "no chr start and stop to messure the distance between genes", icon = "info")
       return()
     }
