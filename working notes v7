@@ -2,6 +2,10 @@ Ben tools v7
 
 http://www.sciviews.org/recipes/tcltk/toc/
 
+seporate sort use full common gene list
+
+replace load color list with one that takes in in gene names and matches them
+
 readinging in URL files ignore blank lines
 
 ues lines and lables funtion to replace standareds 
