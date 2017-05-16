@@ -1661,7 +1661,6 @@ GetColor <- function() {
     num_bins <-
       count_fields(full_file_name,
                    n_max = 1,
-                   skip = 1,
                    tokenizer = tokenizer_tsv())
     if(num_bins == 2){
       color_file <-
@@ -1674,7 +1673,6 @@ GetColor <- function() {
       num_bins <-
         count_fields(full_file_name,
                      n_max = 1,
-                     skip = 1,
                      tokenizer = tokenizer_delim(" "))
       if(num_bins == 2){
         color_file <-
@@ -1688,9 +1686,9 @@ GetColor <- function() {
         for(i in seq_along(color_file$X1)){
           nickname <-
             strsplit(as.character(color_file$X1[i]), '.tab')[[1]][1]
-          num <- grep(nickname, names(LIST_DATA$table_file), ignore.case = TRUE)
+          nums <- grep(nickname, names(LIST_DATA$table_file), ignore.case = TRUE)
           
-          if(length(num) > 0){
+          if(length(nums) > 0){
             if (suppressWarnings(!is.na(as.numeric(substr(
               color_file$X2[i], 1, 1
             )))) == TRUE) {
@@ -1710,26 +1708,20 @@ GetColor <- function() {
             if (!isColor(color_file$X2[i])) {
               color_file$X2[i] <- "black"
             }
-            
+            for(num in nums){
             lapply(seq_along(LIST_DATA$gene_info), function(j) {
-              LIST_DATA$gene_info[[j]][[nickname]][3] <<- color_file$X2[i]
+              LIST_DATA$gene_info[[j]][[num]][3] <<- color_file$X2[i]
             })
-          }
-          
-            if (length(color_file$X2) > 0) {
+            }
+
               color_file2 <- c(color_file$X2)
               kListColorSet <<-  color_file2
-              print(list("I now have these as default colors" = as.character(color_file2)))
               lapply(names(LIST_DATA$gene_info), function(ii) {
                 onlist <- get(paste("listbox_" , ii, "_on", sep = ""))
                 offlist <- get(paste("listbox_" , ii, "_off", sep = ""))
                 tkdelete(onlist, 0, 'end')
                 tkdelete(offlist, 0, 'end')
                 lapply(seq_along(LIST_DATA$gene_info[[ii]]), function(jj) {
-                  color_safe <- jj %% length(color_file2)
-                  if (color_safe == 0) {
-                    color_safe <- 1
-                  }
                   if (LIST_DATA$gene_info[[ii]][[jj]][4] == 1) {
                     tkinsert(onlist, 'end', names(LIST_DATA$gene_info[[ii]][jj]))
                     tkitemconfigure(onlist, "end", foreground = LIST_DATA$gene_info[[ii]][[jj]][3])
@@ -1739,12 +1731,9 @@ GetColor <- function() {
                   }
                 })
               })
-            } else {
-              tkmessageBox(message = "could not make any colors from file", icon = "error")
-              
-            }
+            } 
           }
-          
+        print(list("I now have these as default colors" = as.character(color_file2)))
         tkraise(root)
         return()
       } else {
