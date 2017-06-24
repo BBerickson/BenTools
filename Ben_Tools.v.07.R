@@ -26,11 +26,8 @@ my_packages <- function(x) {
 # run load needed pakages using my_pakages(x)
 suppressPackageStartupMessages(my_packages(
   c(
-    "ggplot2",
+    "tidyverse",
     "tcltk2",
-    "dplyr",
-    "tidyr",
-    "readr",
     "fastcluster",
     "RColorBrewer"
   )
