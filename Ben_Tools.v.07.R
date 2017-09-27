@@ -26,11 +26,8 @@ my_packages <- function(x) {
 # run load needed pakages using my_pakages(x)
 suppressPackageStartupMessages(my_packages(
   c(
-    "ggplot2",
+    "tidyverse",
     "tcltk2",
-    "dplyr",
-    "tidyr",
-    "readr",
     "fastcluster",
     "RColorBrewer"
   )
@@ -96,8 +93,8 @@ list_plot_lines <-
     "543 bins 20,40,40" = c(15.5, 65.5, 20.5, 60.5),
     "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5),
     "543 5k_.5k_.5k_1.5k_20bin_20bin_40bin" = c(10.5, 50.5, 20.5, 40.5),
-    "5 prim 2k 2k 40bins" = c(20.5, 0, 0, 0),
-    "5 prim 1k 1k 80bins" = c(40.5, 0, 0, 0)
+    "5 prim 1k 1k 80bins" = c(40.5, 0, 0, 0),
+    "5 prim .25k 10k 205bins" = c(5.5, 0, 0, 0)
   )
 
 # plot axis ticks and lables
@@ -120,10 +117,13 @@ list_plot_ticks <- list(
       'name' = c('-500 500 1000 1500'),
       'loc' = c(1, 60, 70, 80)
     ),
-  "5 prim 2k 2k 40bins" =
+  "5 prim .25k 10k 205bins" =
     list(
-      'name' = c('-2000', '-1000', '-500', '500', '1000', '2000'),
-      'loc' = c(1, 10, 15, 25, 30, 40)
+      'name' = c("-250", "250", "750", "1250", "1750", "2250", "2750", 
+                 "3250", "3750", "4250", "4750", "5250", "5750", "6250",
+                 "6750", "7250", "7750", "8250", "8750", "9250", "9750"),
+      'loc' = c(1, 11, 21, 31, 41, 51, 61, 71, 81, 91, 101, 111, 121,
+                131, 141, 151, 161, 171, 181, 191, 201)
     ),
   "5 prim 1k 1k 80bins" =
     list(
@@ -888,18 +888,15 @@ LoadTableFile <- function() {
       num_bins <-
         count_fields(x,
                      n_max = 1,
-                     skip = 1,
                      tokenizer = tokenizer_tsv()) - 1
-      
       if (num_bins == 2) {
-        tablefile <- suppressMessages(read_tsv(x,
-                                               col_names = c("gene", "bin", "score"))) %>%
+        tablefile <- suppressMessages(read_tsv(x, col_names = c("gene", "bin", "score"))) %>%
           mutate(set = gsub("(.{17})", "\\1\n", legend_nickname)) %>% na_if(Inf)
-        num_bins <- collapse(summarise(tablefile, max(bin)))[[1]]
+        num_bins <- summarise(tablefile, n_distinct(bin))[[1]]
         if (file_count > 0) {
           if (summarise(LIST_DATA$table_file[[1]], n_distinct(bin)) != num_bins) {
             tkmessageBox(message = "Can't load file, different number of bins", icon = "error")
-            break ()
+            next ()
           }
         }
       } else if (num_bins == 5) {
@@ -913,11 +910,11 @@ LoadTableFile <- function() {
         if (file_count > 0) {
           if (summarise(LIST_DATA$table_file[[1]], n_distinct(bin)) != num_bins) {
             tkmessageBox(message = "Can't load file, different number of bins", icon = "error")
-            break ()
+            next ()
           }
         }
       } else{
-        tablefile <- suppressMessages(read_tsv (x,
+        tablefile <- suppressMessages(read_tsv (x, comment = "#",
                                                 col_names = c("gene", 1:(num_bins)),
                                                 skip = 1, n_max = 5))
         if(sum(is.na(tablefile[,num_bins+1])) == 5){
@@ -931,12 +928,12 @@ LoadTableFile <- function() {
         if (file_count > 0) {
           if (summarise(LIST_DATA$table_file[[1]], n_distinct(bin)) != num_bins2) {
             tkmessageBox(message = "Can't load file, different number of bins", icon = "error")
-            break ()
+            next ()
           }
         }
         
          
-        tablefile <- suppressMessages(read_tsv (x,
+        tablefile <- suppressMessages(read_tsv (x, comment = "#",
                                                 col_names = c("gene", 1:(num_bins)),
                                                 skip = 1) %>% 
                                         gather(., bin, score, 2:(num_bins + 1))) %>% 
@@ -2223,7 +2220,7 @@ GGplotF <-
       theme(axis.title.y = element_text(size =  15)) +
       theme(axis.title.x = element_text(size =  13, vjust = .5)) +
       theme(axis.text.x = element_text(
-        size = 12,
+        size = 13,
         angle = -45,
         hjust = .1,
         vjust = .9,
