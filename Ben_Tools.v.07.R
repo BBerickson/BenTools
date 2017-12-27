@@ -92,6 +92,7 @@ list_plot_lines <-
     "543 bins 20,20,40" = c(15.5, 45.5, 20.5, 40.5),
     "543 bins 20,40,40" = c(15.5, 65.5, 20.5, 60.5),
     "543 bins 10,10,10" = c(5.5, 25.5, 10.5, 20.5),
+    "543 bins 10,10,20" = c(5.5, 25.5, 10.5, 20.5),
     "543 5k_.5k_.5k_1.5k_20bin_20bin_40bin" = c(10.5, 50.5, 20.5, 40.5),
     "5 prim 1k 1k 80bins" = c(40.5, 0, 0, 0),
     "5 prim .25k 10k 205bins" = c(5.5, 0, 0, 0)
@@ -112,6 +113,9 @@ list_plot_ticks <- list(
   "543 bins 10,10,10" =
     list('name' = c('-450', '450'),
          'loc' = c(1, 30)),
+  "543 bins 10,10,20" =
+    list('name' = c('-450 450 950 1450'),
+         'loc' = c(1, 30, 35, 40)),
   "543 5k_.5k_.5k_1.5k_20bin_20bin_40bin" = 
     list(
       'name' = c('-500 500 1000 1500'),
@@ -1824,7 +1828,7 @@ MakeNormFile <- function() {
     # replace 0's with min/2
     new_gene_list <-
       replace_na(new_gene_list,
-                 list(score.y = new_min_for_na))
+                 list(score.y = new_min_for_na, score.x = new_min_for_na))
     setTkProgressBar(pb, 50, label = paste(round(50, 0),
                                            "deviding one by other"))
     LIST_DATA$table_file[[paste(mynom, mydnom, sep = "/")]] <<-
@@ -2825,6 +2829,7 @@ CumulativeDistribution <- function() {
                 sum2 = sum(score[R_start2_bin:R_end2_bin],	na.rm = T)) %>%
       na_if(0) %>%
       replace_na(list(sum1 = new_min_for_na, sum2 = new_min_for_na)) %>%
+      ungroup() %>%
       transmute(set = current_nickname,
                 gene = gene,
                 value = sum1 / sum2) %>%
